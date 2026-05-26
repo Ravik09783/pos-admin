@@ -1,0 +1,990 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    /* Dark mode is default — futuristic restaurant POS aesthetic. */
+    :root,
+    .dark {
+        --background: 222 47% 5%;
+        --foreground: 210 40% 98%;
+
+        --card: 222 47% 7%;
+        --card-foreground: 210 40% 98%;
+
+        --popover: 222 47% 6%;
+        --popover-foreground: 210 40% 98%;
+
+        --primary: 187 100% 55%;            /* electric cyan */
+        --primary-foreground: 222 47% 5%;
+
+        --secondary: 222 24% 14%;
+        --secondary-foreground: 210 40% 98%;
+
+        --muted: 222 24% 12%;
+        --muted-foreground: 215 16% 65%;
+
+        --accent: 222 24% 16%;
+        --accent-foreground: 210 40% 98%;
+
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 210 40% 98%;
+
+        --success: 152 76% 50%;
+        --success-foreground: 222 47% 5%;
+
+        --warning: 38 92% 56%;
+        --warning-foreground: 222 47% 5%;
+
+        --border: 222 24% 14%;
+        --input: 222 24% 14%;
+        --ring: 187 100% 55%;
+
+        --neon-cyan:    187 100% 55%;
+        --neon-magenta: 320 95% 60%;
+        --neon-lime:    140 90% 55%;
+        --neon-amber:   42 100% 60%;
+
+        --radius: 0.65rem;
+    }
+
+    .light {
+        --background: 0 0% 100%;
+        --foreground: 222 47% 11%;
+        --card: 0 0% 100%;
+        --card-foreground: 222 47% 11%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222 47% 11%;
+        --primary: 187 92% 38%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 210 40% 96%;
+        --secondary-foreground: 222 47% 11%;
+        --muted: 210 40% 96%;
+        --muted-foreground: 215 16% 47%;
+        --accent: 210 40% 96%;
+        --accent-foreground: 222 47% 11%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 210 40% 98%;
+        --success: 152 76% 36%;
+        --success-foreground: 0 0% 100%;
+        --warning: 38 92% 50%;
+        --warning-foreground: 0 0% 100%;
+        --border: 214 32% 91%;
+        --input: 214 32% 91%;
+        --ring: 187 92% 38%;
+    }
+
+    /* ── Theme variants — applied via <html data-theme="…"> ───────────────
+     * Source order matters: these come AFTER `:root, .dark` and `.light` so
+     * equal-specificity attribute selectors win. */
+
+    html[data-theme="daylight"] {
+        --background: 0 0% 100%;
+        --foreground: 222 47% 11%;
+        --card: 0 0% 100%;
+        --card-foreground: 222 47% 11%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222 47% 11%;
+        --primary: 187 92% 38%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 210 40% 96%;
+        --secondary-foreground: 222 47% 11%;
+        --muted: 210 40% 96%;
+        --muted-foreground: 215 16% 47%;
+        --accent: 210 40% 96%;
+        --accent-foreground: 222 47% 11%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 210 40% 98%;
+        --success: 152 76% 36%;
+        --success-foreground: 0 0% 100%;
+        --warning: 38 92% 50%;
+        --warning-foreground: 0 0% 100%;
+        --border: 214 32% 91%;
+        --input: 214 32% 91%;
+        --ring: 187 92% 38%;
+        --neon-cyan:    187 92% 38%;
+        --neon-magenta: 320 70% 45%;
+        --neon-lime:    140 60% 35%;
+        --neon-amber:   38 92% 45%;
+    }
+
+    html[data-theme="midnight"] {
+        --background: 235 60% 4%;
+        --foreground: 220 30% 96%;
+        --card: 235 45% 8%;
+        --card-foreground: 220 30% 96%;
+        --popover: 235 45% 7%;
+        --popover-foreground: 220 30% 96%;
+        --primary: 250 90% 65%;
+        --primary-foreground: 235 60% 4%;
+        --secondary: 235 30% 16%;
+        --secondary-foreground: 220 30% 96%;
+        --muted: 235 25% 14%;
+        --muted-foreground: 220 16% 65%;
+        --accent: 235 30% 18%;
+        --accent-foreground: 220 30% 96%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 220 30% 96%;
+        --success: 152 70% 50%;
+        --success-foreground: 235 60% 4%;
+        --warning: 38 92% 56%;
+        --warning-foreground: 235 60% 4%;
+        --border: 235 30% 18%;
+        --input: 235 30% 18%;
+        --ring: 250 90% 65%;
+        --neon-cyan:    200 95% 60%;
+        --neon-magenta: 280 90% 65%;
+        --neon-lime:    160 80% 55%;
+        --neon-amber:   42 95% 60%;
+    }
+
+    html[data-theme="sunset"] {
+        --background: 320 35% 6%;
+        --foreground: 40 30% 96%;
+        --card: 320 30% 10%;
+        --card-foreground: 40 30% 96%;
+        --popover: 320 30% 9%;
+        --popover-foreground: 40 30% 96%;
+        --primary: 25 92% 60%;
+        --primary-foreground: 320 35% 6%;
+        --secondary: 320 22% 16%;
+        --secondary-foreground: 40 30% 96%;
+        --muted: 320 20% 13%;
+        --muted-foreground: 30 12% 65%;
+        --accent: 320 25% 19%;
+        --accent-foreground: 40 30% 96%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 40 30% 96%;
+        --success: 152 70% 50%;
+        --success-foreground: 320 35% 6%;
+        --warning: 38 92% 56%;
+        --warning-foreground: 320 35% 6%;
+        --border: 320 22% 18%;
+        --input: 320 22% 18%;
+        --ring: 25 92% 60%;
+        --neon-cyan:    320 92% 65%;
+        --neon-magenta: 25 92% 60%;
+        --neon-lime:    340 90% 60%;
+        --neon-amber:   38 100% 60%;
+    }
+
+    html[data-theme="forest"] {
+        --background: 155 45% 5%;
+        --foreground: 140 25% 95%;
+        --card: 155 40% 8%;
+        --card-foreground: 140 25% 95%;
+        --popover: 155 40% 7%;
+        --popover-foreground: 140 25% 95%;
+        --primary: 142 70% 50%;
+        --primary-foreground: 155 45% 5%;
+        --secondary: 155 22% 14%;
+        --secondary-foreground: 140 25% 95%;
+        --muted: 155 22% 12%;
+        --muted-foreground: 140 12% 65%;
+        --accent: 155 25% 17%;
+        --accent-foreground: 140 25% 95%;
+        --destructive: 0 80% 55%;
+        --destructive-foreground: 140 25% 95%;
+        --success: 142 80% 55%;
+        --success-foreground: 155 45% 5%;
+        --warning: 38 92% 56%;
+        --warning-foreground: 155 45% 5%;
+        --border: 155 22% 16%;
+        --input: 155 22% 16%;
+        --ring: 142 70% 50%;
+        --neon-cyan:    170 85% 55%;
+        --neon-magenta: 90 80% 55%;
+        --neon-lime:    70 95% 55%;
+        --neon-amber:   45 95% 55%;
+    }
+
+    html[data-theme="mono"] {
+        --background: 0 0% 100%;
+        --foreground: 0 0% 9%;
+        --card: 0 0% 100%;
+        --card-foreground: 0 0% 9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 0 0% 9%;
+        --primary: 0 0% 9%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 0 0% 96%;
+        --secondary-foreground: 0 0% 9%;
+        --muted: 0 0% 96%;
+        --muted-foreground: 0 0% 45%;
+        --accent: 0 0% 92%;
+        --accent-foreground: 0 0% 9%;
+        --destructive: 0 70% 50%;
+        --destructive-foreground: 0 0% 100%;
+        --success: 142 55% 35%;
+        --success-foreground: 0 0% 100%;
+        --warning: 38 85% 45%;
+        --warning-foreground: 0 0% 100%;
+        --border: 0 0% 90%;
+        --input: 0 0% 90%;
+        --ring: 0 0% 9%;
+        --neon-cyan:    0 0% 35%;
+        --neon-magenta: 0 0% 35%;
+        --neon-lime:    0 0% 50%;
+        --neon-amber:   0 0% 50%;
+    }
+
+    /* ── Ocean — deep teal · aqua highlights ─────────────────────────────── */
+    html[data-theme="ocean"] {
+        --background: 195 70% 5%;
+        --foreground: 180 25% 96%;
+        --card: 195 55% 8%;
+        --card-foreground: 180 25% 96%;
+        --popover: 195 55% 7%;
+        --popover-foreground: 180 25% 96%;
+        --primary: 188 92% 48%;
+        --primary-foreground: 195 70% 5%;
+        --secondary: 195 30% 14%;
+        --secondary-foreground: 180 25% 96%;
+        --muted: 195 25% 12%;
+        --muted-foreground: 185 14% 65%;
+        --accent: 195 30% 17%;
+        --accent-foreground: 180 25% 96%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 180 25% 96%;
+        --success: 165 70% 45%;
+        --success-foreground: 195 70% 5%;
+        --warning: 38 92% 56%;
+        --warning-foreground: 195 70% 5%;
+        --border: 195 30% 18%;
+        --input: 195 30% 18%;
+        --ring: 188 92% 48%;
+        --neon-cyan:    188 92% 55%;
+        --neon-magenta: 165 80% 55%;
+        --neon-lime:    170 90% 50%;
+        --neon-amber:   38 95% 55%;
+    }
+
+    /* ── Cherry — rose & pink · romantic dark ────────────────────────────── */
+    html[data-theme="cherry"] {
+        --background: 345 40% 6%;
+        --foreground: 350 30% 96%;
+        --card: 345 35% 10%;
+        --card-foreground: 350 30% 96%;
+        --popover: 345 35% 9%;
+        --popover-foreground: 350 30% 96%;
+        --primary: 350 88% 58%;
+        --primary-foreground: 345 40% 6%;
+        --secondary: 345 22% 16%;
+        --secondary-foreground: 350 30% 96%;
+        --muted: 345 20% 13%;
+        --muted-foreground: 350 12% 65%;
+        --accent: 345 25% 19%;
+        --accent-foreground: 350 30% 96%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 350 30% 96%;
+        --success: 152 70% 50%;
+        --success-foreground: 345 40% 6%;
+        --warning: 38 92% 56%;
+        --warning-foreground: 345 40% 6%;
+        --border: 345 22% 18%;
+        --input: 345 22% 18%;
+        --ring: 350 88% 58%;
+        --neon-cyan:    340 92% 65%;
+        --neon-magenta: 355 92% 60%;
+        --neon-lime:    320 80% 60%;
+        --neon-amber:   38 100% 60%;
+    }
+
+    /* ── Royal — deep purple with warm gold ──────────────────────────────── */
+    html[data-theme="royal"] {
+        --background: 268 50% 6%;
+        --foreground: 45 25% 96%;
+        --card: 268 40% 10%;
+        --card-foreground: 45 25% 96%;
+        --popover: 268 40% 9%;
+        --popover-foreground: 45 25% 96%;
+        --primary: 270 78% 60%;
+        --primary-foreground: 268 50% 6%;
+        --secondary: 268 25% 16%;
+        --secondary-foreground: 45 25% 96%;
+        --muted: 268 22% 13%;
+        --muted-foreground: 45 14% 65%;
+        --accent: 268 28% 19%;
+        --accent-foreground: 45 25% 96%;
+        --destructive: 0 80% 55%;
+        --destructive-foreground: 45 25% 96%;
+        --success: 152 65% 50%;
+        --success-foreground: 268 50% 6%;
+        --warning: 42 95% 55%;
+        --warning-foreground: 268 50% 6%;
+        --border: 268 25% 18%;
+        --input: 268 25% 18%;
+        --ring: 270 78% 60%;
+        --neon-cyan:    270 80% 70%;
+        --neon-magenta: 285 85% 60%;
+        --neon-lime:    45 95% 60%;
+        --neon-amber:   38 100% 58%;
+    }
+
+    /* ── Volcano — fiery red over charcoal ───────────────────────────────── */
+    html[data-theme="volcano"] {
+        --background: 0 30% 5%;
+        --foreground: 30 25% 96%;
+        --card: 0 20% 8%;
+        --card-foreground: 30 25% 96%;
+        --popover: 0 20% 7%;
+        --popover-foreground: 30 25% 96%;
+        --primary: 8 92% 56%;
+        --primary-foreground: 30 25% 96%;
+        --secondary: 0 15% 14%;
+        --secondary-foreground: 30 25% 96%;
+        --muted: 0 12% 12%;
+        --muted-foreground: 30 10% 65%;
+        --accent: 0 18% 17%;
+        --accent-foreground: 30 25% 96%;
+        --destructive: 0 92% 50%;
+        --destructive-foreground: 30 25% 96%;
+        --success: 142 70% 50%;
+        --success-foreground: 0 30% 5%;
+        --warning: 38 92% 56%;
+        --warning-foreground: 0 30% 5%;
+        --border: 0 18% 18%;
+        --input: 0 18% 18%;
+        --ring: 8 92% 56%;
+        --neon-cyan:    20 95% 60%;
+        --neon-magenta: 0 95% 60%;
+        --neon-lime:    38 95% 60%;
+        --neon-amber:   25 100% 55%;
+    }
+
+    /* ── Galaxy — cosmic violet, blue & pink stars ───────────────────────── */
+    html[data-theme="galaxy"] {
+        --background: 250 60% 5%;
+        --foreground: 280 25% 97%;
+        --card: 250 50% 9%;
+        --card-foreground: 280 25% 97%;
+        --popover: 250 50% 8%;
+        --popover-foreground: 280 25% 97%;
+        --primary: 263 85% 65%;
+        --primary-foreground: 250 60% 5%;
+        --secondary: 250 30% 16%;
+        --secondary-foreground: 280 25% 97%;
+        --muted: 250 25% 13%;
+        --muted-foreground: 280 14% 68%;
+        --accent: 250 32% 19%;
+        --accent-foreground: 280 25% 97%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 280 25% 97%;
+        --success: 160 75% 55%;
+        --success-foreground: 250 60% 5%;
+        --warning: 38 95% 60%;
+        --warning-foreground: 250 60% 5%;
+        --border: 250 30% 19%;
+        --input: 250 30% 19%;
+        --ring: 263 85% 65%;
+        --neon-cyan:    210 95% 65%;
+        --neon-magenta: 295 92% 70%;
+        --neon-lime:    180 80% 60%;
+        --neon-amber:   42 95% 60%;
+    }
+
+    /* ── Slate — neutral cool gray · professional ────────────────────────── */
+    html[data-theme="slate"] {
+        --background: 222 40% 7%;
+        --foreground: 215 20% 95%;
+        --card: 222 30% 11%;
+        --card-foreground: 215 20% 95%;
+        --popover: 222 30% 10%;
+        --popover-foreground: 215 20% 95%;
+        --primary: 217 35% 70%;
+        --primary-foreground: 222 40% 7%;
+        --secondary: 222 22% 16%;
+        --secondary-foreground: 215 20% 95%;
+        --muted: 222 20% 14%;
+        --muted-foreground: 215 14% 60%;
+        --accent: 222 25% 19%;
+        --accent-foreground: 215 20% 95%;
+        --destructive: 0 80% 55%;
+        --destructive-foreground: 215 20% 95%;
+        --success: 152 60% 45%;
+        --success-foreground: 222 40% 7%;
+        --warning: 38 85% 55%;
+        --warning-foreground: 222 40% 7%;
+        --border: 222 22% 19%;
+        --input: 222 22% 19%;
+        --ring: 217 35% 70%;
+        --neon-cyan:    200 50% 60%;
+        --neon-magenta: 240 35% 60%;
+        --neon-lime:    160 35% 55%;
+        --neon-amber:   38 70% 60%;
+    }
+
+    /* ── Pastel — soft mint, peach & lavender (light) ────────────────────── */
+    html[data-theme="pastel"] {
+        --background: 300 50% 99%;
+        --foreground: 270 30% 18%;
+        --card: 0 0% 100%;
+        --card-foreground: 270 30% 18%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 270 30% 18%;
+        --primary: 260 78% 70%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 320 40% 96%;
+        --secondary-foreground: 270 30% 18%;
+        --muted: 320 30% 95%;
+        --muted-foreground: 270 14% 50%;
+        --accent: 165 60% 92%;
+        --accent-foreground: 270 30% 18%;
+        --destructive: 0 75% 60%;
+        --destructive-foreground: 0 0% 100%;
+        --success: 152 55% 50%;
+        --success-foreground: 0 0% 100%;
+        --warning: 35 90% 60%;
+        --warning-foreground: 0 0% 100%;
+        --border: 300 35% 90%;
+        --input: 300 35% 90%;
+        --ring: 260 78% 70%;
+        --neon-cyan:    175 70% 55%;
+        --neon-magenta: 340 80% 70%;
+        --neon-lime:    140 60% 60%;
+        --neon-amber:   35 95% 65%;
+    }
+
+    /* ── Bakery — warm cream background + bakery-orange accent ──────────────
+     * Matches the "menu + current order" reference design: airy off-white
+     * canvas, pure-white product cards, vibrant orange for prices + the
+     * primary CTA, soft warm gray for borders + descriptions. Anywhere a
+     * component reads `--primary` (cart actions, +/- buttons on tiles, the
+     * Generate-invoice button, the in-cart badge) the orange now drives
+     * the visual rhythm. Neon-cyan/magenta are swapped for peach + amber
+     * so any gradient component stays warm instead of clashing into pink. */
+    html[data-theme="bakery"] {
+        --background: 36 30% 96%;
+        --foreground: 24 18% 16%;
+        --card: 0 0% 100%;
+        --card-foreground: 24 18% 16%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 24 18% 16%;
+        --primary: 24 95% 53%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 32 24% 94%;
+        --secondary-foreground: 24 18% 16%;
+        --muted: 32 22% 93%;
+        --muted-foreground: 28 8% 45%;
+        --accent: 32 30% 92%;
+        --accent-foreground: 24 18% 16%;
+        --destructive: 0 78% 55%;
+        --destructive-foreground: 0 0% 100%;
+        --success: 152 60% 42%;
+        --success-foreground: 0 0% 100%;
+        --warning: 38 92% 50%;
+        --warning-foreground: 24 18% 16%;
+        --border: 30 18% 88%;
+        --input: 30 18% 88%;
+        --ring: 24 95% 53%;
+        /* Warm-only accent triad. Anything that used to glow cyan/magenta
+         * now glows orange/peach — keeps every gradient on the page from
+         * fighting the bakery palette. */
+        --neon-cyan:    20 95% 60%;
+        --neon-magenta: 18 88% 65%;
+        --neon-lime:    40 95% 58%;
+        --neon-amber:   32 100% 60%;
+    }
+
+    /* =========================================================================
+     *  FESTIVAL THEMES
+     *  ----------------------------------------------------------------------
+     *  Each celebrates a holiday's visual language while keeping the same
+     *  CSS-variable contract every component already reads from. Backgrounds
+     *  are tuned for legibility first; the "festive" colors land on primary
+     *  buttons, accent chips and the neon-* highlights.
+     * ===================================================================== */
+
+    /* ── Diwali — lamps glow · gold & magenta on indigo ──────────────────── */
+    html[data-theme="diwali"] {
+        --background: 268 60% 6%;
+        --foreground: 45 35% 96%;
+        --card: 268 50% 10%;
+        --card-foreground: 45 35% 96%;
+        --popover: 268 50% 9%;
+        --popover-foreground: 45 35% 96%;
+        --primary: 42 95% 55%;                  /* deep gold */
+        --primary-foreground: 268 60% 6%;
+        --secondary: 268 30% 16%;
+        --secondary-foreground: 45 35% 96%;
+        --muted: 268 25% 13%;
+        --muted-foreground: 45 18% 70%;
+        --accent: 320 60% 25%;
+        --accent-foreground: 45 35% 96%;
+        --destructive: 0 80% 55%;
+        --destructive-foreground: 45 35% 96%;
+        --success: 142 70% 50%;
+        --success-foreground: 268 60% 6%;
+        --warning: 42 100% 55%;
+        --warning-foreground: 268 60% 6%;
+        --border: 268 30% 20%;
+        --input: 268 30% 20%;
+        --ring: 42 95% 55%;
+        --neon-cyan:    42 100% 60%;            /* diya flame */
+        --neon-magenta: 325 92% 60%;
+        --neon-lime:    25 95% 55%;
+        --neon-amber:   42 100% 55%;
+    }
+
+    /* ── Holi — colour-burst · magenta, lime, cyan, gold ─────────────────── */
+    html[data-theme="holi"] {
+        --background: 45 80% 97%;
+        --foreground: 320 35% 14%;
+        --card: 0 0% 100%;
+        --card-foreground: 320 35% 14%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 320 35% 14%;
+        --primary: 325 90% 55%;                 /* gulal pink */
+        --primary-foreground: 0 0% 100%;
+        --secondary: 45 80% 92%;
+        --secondary-foreground: 320 35% 14%;
+        --muted: 45 60% 92%;
+        --muted-foreground: 320 18% 40%;
+        --accent: 175 70% 90%;
+        --accent-foreground: 320 35% 14%;
+        --destructive: 0 80% 55%;
+        --destructive-foreground: 0 0% 100%;
+        --success: 142 65% 40%;
+        --success-foreground: 0 0% 100%;
+        --warning: 38 95% 50%;
+        --warning-foreground: 0 0% 100%;
+        --border: 45 50% 86%;
+        --input: 45 50% 86%;
+        --ring: 325 90% 55%;
+        --neon-cyan:    180 85% 45%;
+        --neon-magenta: 325 90% 55%;
+        --neon-lime:    142 70% 45%;
+        --neon-amber:   38 100% 55%;
+    }
+
+    /* ── Dussehra — saffron & vermilion on deep maroon ───────────────────── */
+    html[data-theme="dussehra"] {
+        --background: 0 50% 6%;
+        --foreground: 40 35% 96%;
+        --card: 0 40% 10%;
+        --card-foreground: 40 35% 96%;
+        --popover: 0 40% 9%;
+        --popover-foreground: 40 35% 96%;
+        --primary: 22 92% 55%;                  /* saffron */
+        --primary-foreground: 0 50% 6%;
+        --secondary: 0 25% 16%;
+        --secondary-foreground: 40 35% 96%;
+        --muted: 0 22% 13%;
+        --muted-foreground: 40 14% 68%;
+        --accent: 42 60% 22%;
+        --accent-foreground: 40 35% 96%;
+        --destructive: 0 92% 55%;
+        --destructive-foreground: 40 35% 96%;
+        --success: 142 70% 50%;
+        --success-foreground: 0 50% 6%;
+        --warning: 42 100% 55%;
+        --warning-foreground: 0 50% 6%;
+        --border: 0 25% 20%;
+        --input: 0 25% 20%;
+        --ring: 22 92% 55%;
+        --neon-cyan:    22 95% 60%;
+        --neon-magenta: 0 90% 55%;
+        --neon-lime:    42 100% 55%;
+        --neon-amber:   30 100% 55%;
+    }
+
+    /* ── Onam — kerala white · pookalam green & gold ─────────────────────── */
+    html[data-theme="onam"] {
+        --background: 45 60% 96%;
+        --foreground: 145 35% 14%;
+        --card: 0 0% 100%;
+        --card-foreground: 145 35% 14%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 145 35% 14%;
+        --primary: 142 65% 32%;                 /* deep banana-leaf green */
+        --primary-foreground: 0 0% 100%;
+        --secondary: 45 55% 90%;
+        --secondary-foreground: 145 35% 14%;
+        --muted: 45 45% 90%;
+        --muted-foreground: 145 14% 38%;
+        --accent: 45 70% 86%;
+        --accent-foreground: 145 35% 14%;
+        --destructive: 0 75% 50%;
+        --destructive-foreground: 0 0% 100%;
+        --success: 142 70% 38%;
+        --success-foreground: 0 0% 100%;
+        --warning: 42 95% 50%;
+        --warning-foreground: 0 0% 100%;
+        --border: 45 35% 84%;
+        --input: 45 35% 84%;
+        --ring: 142 65% 32%;
+        --neon-cyan:    142 65% 38%;
+        --neon-magenta: 350 75% 55%;
+        --neon-lime:    65 65% 45%;
+        --neon-amber:   42 95% 50%;
+    }
+
+    /* ── Eid — emerald & gold · crescent night ───────────────────────────── */
+    html[data-theme="eid"] {
+        --background: 160 60% 5%;
+        --foreground: 45 30% 96%;
+        --card: 160 50% 9%;
+        --card-foreground: 45 30% 96%;
+        --popover: 160 50% 8%;
+        --popover-foreground: 45 30% 96%;
+        --primary: 158 70% 42%;                 /* emerald */
+        --primary-foreground: 160 60% 5%;
+        --secondary: 160 28% 15%;
+        --secondary-foreground: 45 30% 96%;
+        --muted: 160 24% 13%;
+        --muted-foreground: 45 14% 68%;
+        --accent: 45 60% 22%;
+        --accent-foreground: 45 30% 96%;
+        --destructive: 0 80% 55%;
+        --destructive-foreground: 45 30% 96%;
+        --success: 152 75% 50%;
+        --success-foreground: 160 60% 5%;
+        --warning: 42 100% 55%;
+        --warning-foreground: 160 60% 5%;
+        --border: 160 28% 18%;
+        --input: 160 28% 18%;
+        --ring: 158 70% 42%;
+        --neon-cyan:    158 70% 50%;
+        --neon-magenta: 45 100% 60%;
+        --neon-lime:    140 70% 50%;
+        --neon-amber:   45 100% 55%;
+    }
+
+    /* ── Christmas — evergreen, ruby red & gold trim ─────────────────────── */
+    html[data-theme="christmas"] {
+        --background: 145 50% 6%;
+        --foreground: 40 30% 96%;
+        --card: 145 40% 10%;
+        --card-foreground: 40 30% 96%;
+        --popover: 145 40% 9%;
+        --popover-foreground: 40 30% 96%;
+        --primary: 0 75% 50%;                   /* ruby red */
+        --primary-foreground: 40 30% 96%;
+        --secondary: 145 25% 16%;
+        --secondary-foreground: 40 30% 96%;
+        --muted: 145 22% 13%;
+        --muted-foreground: 40 14% 68%;
+        --accent: 42 60% 22%;
+        --accent-foreground: 40 30% 96%;
+        --destructive: 0 92% 55%;
+        --destructive-foreground: 40 30% 96%;
+        --success: 142 75% 45%;
+        --success-foreground: 40 30% 96%;
+        --warning: 42 100% 55%;
+        --warning-foreground: 145 50% 6%;
+        --border: 145 25% 19%;
+        --input: 145 25% 19%;
+        --ring: 0 75% 50%;
+        --neon-cyan:    42 100% 60%;
+        --neon-magenta: 0 92% 55%;
+        --neon-lime:    142 75% 50%;
+        --neon-amber:   42 100% 55%;
+    }
+
+    /* ── New Year — champagne gold & silver on midnight ──────────────────── */
+    html[data-theme="newyear"] {
+        --background: 230 60% 5%;
+        --foreground: 45 35% 96%;
+        --card: 230 45% 9%;
+        --card-foreground: 45 35% 96%;
+        --popover: 230 45% 8%;
+        --popover-foreground: 45 35% 96%;
+        --primary: 45 90% 60%;                  /* champagne gold */
+        --primary-foreground: 230 60% 5%;
+        --secondary: 230 25% 16%;
+        --secondary-foreground: 45 35% 96%;
+        --muted: 230 22% 13%;
+        --muted-foreground: 45 14% 70%;
+        --accent: 220 20% 25%;
+        --accent-foreground: 45 35% 96%;
+        --destructive: 0 80% 55%;
+        --destructive-foreground: 45 35% 96%;
+        --success: 152 70% 50%;
+        --success-foreground: 230 60% 5%;
+        --warning: 42 100% 55%;
+        --warning-foreground: 230 60% 5%;
+        --border: 230 25% 22%;
+        --input: 230 25% 22%;
+        --ring: 45 90% 60%;
+        --neon-cyan:    220 25% 80%;            /* silver shimmer */
+        --neon-magenta: 280 60% 65%;
+        --neon-lime:    45 95% 60%;
+        --neon-amber:   42 100% 55%;
+    }
+
+    /* ── Valentine — rose & red · soft romance (light) ───────────────────── */
+    html[data-theme="valentine"] {
+        --background: 350 90% 98%;
+        --foreground: 345 50% 18%;
+        --card: 0 0% 100%;
+        --card-foreground: 345 50% 18%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 345 50% 18%;
+        --primary: 350 80% 50%;                 /* deep rose */
+        --primary-foreground: 0 0% 100%;
+        --secondary: 350 60% 95%;
+        --secondary-foreground: 345 50% 18%;
+        --muted: 350 50% 95%;
+        --muted-foreground: 345 18% 45%;
+        --accent: 340 70% 92%;
+        --accent-foreground: 345 50% 18%;
+        --destructive: 0 75% 50%;
+        --destructive-foreground: 0 0% 100%;
+        --success: 152 55% 45%;
+        --success-foreground: 0 0% 100%;
+        --warning: 35 90% 55%;
+        --warning-foreground: 0 0% 100%;
+        --border: 350 40% 88%;
+        --input: 350 40% 88%;
+        --ring: 350 80% 50%;
+        --neon-cyan:    340 75% 60%;
+        --neon-magenta: 350 80% 55%;
+        --neon-lime:    20 80% 60%;
+        --neon-amber:   35 95% 55%;
+    }
+
+    /* ── Halloween — pumpkin orange & witch violet on black ──────────────── */
+    html[data-theme="halloween"] {
+        --background: 280 25% 5%;
+        --foreground: 30 30% 96%;
+        --card: 280 20% 8%;
+        --card-foreground: 30 30% 96%;
+        --popover: 280 20% 7%;
+        --popover-foreground: 30 30% 96%;
+        --primary: 24 95% 55%;                  /* pumpkin orange */
+        --primary-foreground: 280 25% 5%;
+        --secondary: 280 15% 14%;
+        --secondary-foreground: 30 30% 96%;
+        --muted: 280 12% 12%;
+        --muted-foreground: 30 12% 65%;
+        --accent: 270 50% 22%;
+        --accent-foreground: 30 30% 96%;
+        --destructive: 0 92% 55%;
+        --destructive-foreground: 30 30% 96%;
+        --success: 142 65% 50%;
+        --success-foreground: 280 25% 5%;
+        --warning: 42 100% 55%;
+        --warning-foreground: 280 25% 5%;
+        --border: 280 15% 17%;
+        --input: 280 15% 17%;
+        --ring: 24 95% 55%;
+        --neon-cyan:    270 85% 65%;            /* witch violet */
+        --neon-magenta: 24 95% 60%;
+        --neon-lime:    140 60% 50%;
+        --neon-amber:   42 100% 55%;
+    }
+
+    /* ── Sepia — warm sepia · easy reading (light) ───────────────────────── */
+    html[data-theme="sepia"] {
+        --background: 38 45% 92%;
+        --foreground: 25 35% 18%;
+        --card: 38 50% 95%;
+        --card-foreground: 25 35% 18%;
+        --popover: 38 50% 95%;
+        --popover-foreground: 25 35% 18%;
+        --primary: 25 75% 35%;
+        --primary-foreground: 38 50% 96%;
+        --secondary: 38 35% 86%;
+        --secondary-foreground: 25 35% 18%;
+        --muted: 38 30% 85%;
+        --muted-foreground: 25 18% 45%;
+        --accent: 32 45% 82%;
+        --accent-foreground: 25 35% 18%;
+        --destructive: 0 70% 45%;
+        --destructive-foreground: 38 50% 96%;
+        --success: 152 60% 35%;
+        --success-foreground: 38 50% 96%;
+        --warning: 32 90% 45%;
+        --warning-foreground: 38 50% 96%;
+        --border: 32 30% 78%;
+        --input: 32 30% 78%;
+        --ring: 25 75% 35%;
+        --neon-cyan:    195 55% 35%;
+        --neon-magenta: 12 65% 45%;
+        --neon-lime:    65 55% 40%;
+        --neon-amber:   32 90% 45%;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    html, body {
+        @apply bg-background text-foreground antialiased;
+        font-feature-settings: "cv11", "ss01", "ss03";
+    }
+    body {
+        background-image:
+            radial-gradient(ellipse 80% 50% at 50% -20%, hsl(var(--neon-cyan) / 0.10), transparent 60%),
+            radial-gradient(ellipse 60% 50% at 90% 110%, hsl(var(--neon-magenta) / 0.08), transparent 60%);
+        background-attachment: fixed;
+    }
+    /* Every semantic heading uses DM Sans — the entire UI is one
+     *  typeface, no serif fallback (no "Times New Roman"). The tighter
+     *  letter-spacing keeps headings distinct from body copy. */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+        letter-spacing: -0.01em;
+    }
+    /* The customer-facing display runs on Inter end-to-end — headings
+     *  included — so its headings inherit Inter from the `.customer-display`
+     *  root instead of the app-wide DM Sans rule above. */
+    .customer-display :is(h1, h2, h3, h4, h5, h6) {
+        font-family: inherit;
+    }
+}
+
+@layer components {
+    .glass {
+        @apply bg-card/60 backdrop-blur-xl border border-border/60;
+    }
+    .glass-strong {
+        @apply bg-card/80 backdrop-blur-2xl border border-border;
+    }
+    .neon-border {
+        box-shadow:
+            0 0 0 1px hsl(var(--border)),
+            inset 0 1px 0 0 hsl(var(--neon-cyan) / 0.06),
+            0 8px 30px -10px hsl(var(--neon-cyan) / 0.25);
+    }
+    .text-gradient {
+        @apply bg-clip-text text-transparent;
+        background-image: linear-gradient(120deg, hsl(var(--neon-cyan)), hsl(var(--neon-magenta)));
+    }
+    .text-gradient-warm {
+        @apply bg-clip-text text-transparent;
+        background-image: linear-gradient(120deg, hsl(var(--neon-amber)), hsl(var(--neon-magenta)));
+    }
+    /* ── Themed scrollbars ────────────────────────────────────────────
+       Default scrollbars across the app pick up the current theme colors
+       so they don't break the visual language (the chunky grey OS bar
+       on a Neon-purple POS looks awful). Applied globally on `pointer:
+       fine` devices — phones use overlay scrollbars and don't need it.
+       ----------------------------------------------------------------- */
+    @media (pointer: fine) {
+        html {
+            scrollbar-width: thin;
+            scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+        }
+        *::-webkit-scrollbar { width: 8px; height: 8px; }
+        *::-webkit-scrollbar-track { background: transparent; }
+        *::-webkit-scrollbar-thumb {
+            background: hsl(var(--muted-foreground) / 0.35);
+            border-radius: 9999px;
+            transition: background 150ms ease;
+        }
+        *::-webkit-scrollbar-thumb:hover {
+            background: hsl(var(--primary) / 0.6);
+        }
+        *::-webkit-scrollbar-corner { background: transparent; }
+    }
+
+    /* Thinner variant — opt-in for tight surfaces (the cart aside, the
+       category chips strip). Same theme-driven colors. */
+    .scrollbar-thin {
+        scrollbar-width: thin;
+        scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+    }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+        background: hsl(var(--muted-foreground) / 0.35);
+        border-radius: 9999px;
+        transition: background 150ms ease;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+        background: hsl(var(--primary) / 0.6);
+    }
+
+    /* Themed (more prominent) — primary-tinted gradient thumb, used on
+       dialog + sheet popups where the scrollbar competes with strong
+       content. */
+    .scrollbar-themed {
+        scrollbar-width: thin;
+        scrollbar-color: hsl(var(--primary) / 0.55) transparent;
+    }
+    .scrollbar-themed::-webkit-scrollbar { width: 10px; height: 10px; }
+    .scrollbar-themed::-webkit-scrollbar-track { background: transparent; }
+    .scrollbar-themed::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg,
+            hsl(var(--primary) / 0.55),
+            hsl(var(--neon-magenta) / 0.55));
+        border-radius: 9999px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        transition: filter 150ms ease;
+    }
+    .scrollbar-themed::-webkit-scrollbar-thumb:hover {
+        filter: brightness(1.25);
+    }
+    .scrollbar-themed::-webkit-scrollbar-corner { background: transparent; }
+}
+
+@layer utilities {
+    .text-balance { text-wrap: balance; }
+    .grid-bg {
+        background-image:
+            linear-gradient(hsl(var(--border)/0.4) 1px, transparent 1px),
+            linear-gradient(90deg, hsl(var(--border)/0.4) 1px, transparent 1px);
+        background-size: 32px 32px;
+        mask-image: radial-gradient(ellipse 80% 50% at 50% 0%, black, transparent 70%);
+    }
+}
+
+/* Print: receipts use a clean white sheet regardless of UI theme */
+@media print {
+    html, body {
+        background: white !important;
+        color: black !important;
+    }
+    .no-print { display: none !important; }
+}
+
+/* =========================================================================
+ *  FESTIVAL AMBIENT — falling/floating emoji layer.
+ *  Mounted once at the root layout. Pointer-events: none → never blocks
+ *  clicks; sits behind every dialog (modals are z-50+). Desktop only:
+ *  hidden under 1024 px and when prefers-reduced-motion is on, both as a
+ *  CSS belt and as a JS suspender (the component already skips render).
+ * ===================================================================== */
+.festival-ambient {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+}
+.festival-particle {
+    position: absolute;
+    top: -10vh;
+    display: inline-block;
+    line-height: 1;
+    user-select: none;
+    will-change: transform, top;
+    animation-name: festival-fall;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    /* Slight glow so a snowflake / diya doesn't disappear into a bright
+     * background like Holi or Onam. Cheap and only on the particle itself. */
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+}
+@keyframes festival-fall {
+    from {
+        top: -10vh;
+        transform: translate3d(0, 0, 0) rotate(0deg);
+    }
+    to {
+        top: 110vh;
+        transform: translate3d(var(--festival-drift, 20vw), 0, 0) rotate(var(--festival-rotate, 360deg));
+    }
+}
+@media (max-width: 1023px) {
+    .festival-ambient { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .festival-ambient { display: none; }
+}
+@media print {
+    .festival-ambient { display: none; }
+}

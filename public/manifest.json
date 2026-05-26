@@ -1,0 +1,25 @@
+{
+    "name": "RestoPOS",
+    "short_name": "RestoPOS",
+    "description": "Cloud POS for restaurants — GST-ready, CA-ready",
+    "start_url": "/dashboard",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#0a0e1a",
+    "theme_color": "#0a0e1a",
+    "icons": [
+        {
+            "src": "/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ],
+    "shortcuts": [
+        { "name": "POS",        "url": "/pos",        "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }] },
+        { "name": "Kitchen",    "url": "/kds",        "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }] },
+        { "name": "CA Export",  "url": "/ca-export",  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }] }
+    ],
+    "categories": ["business", "food", "productivity"]
+}

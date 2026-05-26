@@ -1,0 +1,151 @@
+/* =========================================================================
+ *  Storybook Docs overrides — runs INSIDE the preview iframe alongside the
+ *  app's globals.css.
+ *
+ *  Why this exists:
+ *  Our app body gets `bg-background text-foreground` from `src/app/globals.css`,
+ *  which resolves to near-black on the default Neon theme. Storybook's Docs
+ *  blocks render auto-generated description / prop-tables / story labels
+ *  with default light-theme styling — dark text on our dark body produced
+ *  the infamous "black screen" Docs view.
+ *
+ *  This file paints the entire `.sbdocs` surface using our CSS variables so
+ *  it (a) is always readable and (b) automatically re-skins when the user
+ *  flips the toolbar theme picker (neon → daylight → cherry, etc.).
+ * ========================================================================= */
+
+/* Wrapper / content panels — solid surfaces that the docs blocks pile onto. */
+.sbdocs,
+.sbdocs-wrapper,
+.sbdocs-content {
+    background: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+}
+
+/* The `sbdocs-content` is a max-width column with white default bg —
+   reset it to transparent so the wrapper's themed bg shows through. */
+.sbdocs-content {
+    background: transparent !important;
+}
+
+/* Headings — autodocs renders the component title, story labels, section
+   headers as <h1>/<h2>/<h3>. Force them to our foreground colour. */
+.sbdocs-title,
+.sbdocs-subtitle,
+.sbdocs-h1,
+.sbdocs-h2,
+.sbdocs-h3,
+.sbdocs-h4,
+.sbdocs-h5,
+.sbdocs-h6,
+.sbdocs h1,
+.sbdocs h2,
+.sbdocs h3,
+.sbdocs h4 {
+    color: hsl(var(--foreground)) !important;
+    border-bottom-color: hsl(var(--border)) !important;
+}
+
+/* Body text — paragraphs, list items, captions. */
+.sbdocs p,
+.sbdocs li,
+.sbdocs-p {
+    color: hsl(var(--foreground) / 0.88) !important;
+}
+
+/* Anchor links inside descriptions. */
+.sbdocs a {
+    color: hsl(var(--primary)) !important;
+}
+.sbdocs a:hover {
+    color: hsl(var(--neon-magenta)) !important;
+}
+
+/* Inline + block code samples. Use the muted surface so they pop without
+   competing with the page background. */
+.sbdocs code,
+.sbdocs pre {
+    background: hsl(var(--muted)) !important;
+    color: hsl(var(--foreground)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    border-radius: 0.5rem;
+}
+.sbdocs pre {
+    padding: 0.75rem 1rem;
+}
+.sbdocs pre code {
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+}
+
+/* Argument tables — Storybook's auto-generated prop reference. */
+.sbdocs table,
+.sbdocs-table {
+    color: hsl(var(--foreground)) !important;
+    background: hsl(var(--card)) !important;
+    border-color: hsl(var(--border)) !important;
+}
+.sbdocs th {
+    background: hsl(var(--muted)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+}
+.sbdocs td {
+    color: hsl(var(--foreground) / 0.88) !important;
+    border-color: hsl(var(--border)) !important;
+}
+.sbdocs tr {
+    border-color: hsl(var(--border)) !important;
+}
+
+/* Argument-row "controls" cells — number inputs, selects, toggles. */
+.sbdocs input,
+.sbdocs select,
+.sbdocs textarea {
+    background: hsl(var(--input)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+}
+
+/* "Show code" toggle and the Source block. */
+.docblock-source,
+.sbdocs .docblock-source {
+    background: hsl(var(--muted)) !important;
+    color: hsl(var(--foreground)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+}
+
+/* The story preview boxes inside Docs (each `<Canvas>` block). The default
+   wraps stories in a white rectangle; tone it to our card surface so the
+   themed component sits on a themed plate. */
+.docs-story,
+.sbdocs .docs-story,
+.sb-story {
+    background: hsl(var(--card)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    border-radius: 0.75rem;
+}
+
+/* Tab list above the canvas (Preview / Source). */
+.tabbutton,
+.sbdocs .tabbutton {
+    color: hsl(var(--muted-foreground)) !important;
+}
+.tabbutton-active,
+.sbdocs .tabbutton-active {
+    color: hsl(var(--primary)) !important;
+    border-bottom-color: hsl(var(--primary)) !important;
+}
+
+/* Horizontal rule between sections. */
+.sbdocs hr {
+    border-color: hsl(var(--border)) !important;
+}
+
+/* Blockquote callouts in descriptions. */
+.sbdocs blockquote {
+    border-left: 3px solid hsl(var(--primary)) !important;
+    background: hsl(var(--muted) / 0.4) !important;
+    color: hsl(var(--foreground) / 0.88) !important;
+}

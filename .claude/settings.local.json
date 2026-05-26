@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/Baljinder/**)",
+      "Bash(npx --yes create-next-app@14 pos-app --typescript --tailwind --app --src-dir --import-alias \"@/*\" --use-npm --no-eslint)",
+      "Bash(mv pos-app/* pos-app/.* pos/)",
+      "Bash(rmdir pos-app *)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(rm \"d:/Baljinder/pos/src/app/qr/[tenantSlug]/[tableNum]/page.tsx\")",
+      "Bash(echo \"TSC=$?\")",
+      "Bash(npx vitest *)",
+      "Bash(npx next *)",
+      "Bash(curl -s \"http://localhost:6067/iframe.html?viewMode=docs&id=appshell-branchswitcher--docs\" -o storybook-docs-response.html)",
+      "Bash(xargs grep -l \"DocsContainer\")",
+      "Bash(npm view *)",
+      "Bash(npx storybook *)",
+      "PowerShell($env:SVC = \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5dml6a3lzaGp3endvaWh2eWtsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTIzOTQ4MCwiZXhwIjoyMDk0ODE1NDgwfQ.8EPCs9d9SBhY_qXTKGAZRC5AcLwSd_gTKqiQ8P_-ZaQ\"; node scripts/diag-display.mjs)",
+      "Bash(node scripts/build-combined-schema.mjs)",
+      "Bash(node -e \"const d=require\\('./package.json'\\).dependencies; console.log\\(Object.keys\\(d\\).filter\\(k=>/markdown|editor|tiptap|prosemirror|slate|quill|lexical|remark|mdx|dompurify|sanitize/i.test\\(k\\)\\).join\\(', '\\)||'\\(no editor/markdown libs\\)'\\)\")",
+      "Bash(node -e \"console.log\\(Object.keys\\(require\\('./package.json'\\).dependencies\\).join\\(', '\\)\\)\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(node -e \"console.log\\(require\\('recharts/package.json'\\).version\\)\")",
+      "Bash(dir \"src\\\\app\\\\\\(app\\)\\\\settings\\\\role-templates\")",
+      "Bash(dir \"src\\\\app\\\\\\(app\\)\\\\settings\\\\staff\\\\[userId]\")",
+      "Bash(dir \"src\\\\components\\\\ui\\\\switch.tsx\")",
+      "Bash(dir \"D:\\\\Baljinder\\\\pos-g\\\\pos\\\\supabase\\\\migrations\" /b)"
+    ],
+    "additionalDirectories": [
+      "d:\\Baljinder\\pos\\src\\app\\qr\\[tenantSlug]\\[tableNum]"
+    ]
+  }
+}

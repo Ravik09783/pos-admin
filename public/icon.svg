@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <defs>
+        <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#22d3ee"/>
+            <stop offset="100%" stop-color="#ec4899"/>
+        </linearGradient>
+    </defs>
+    <rect width="512" height="512" rx="96" fill="#0a0e1a"/>
+    <rect x="24" y="24" width="464" height="464" rx="80" fill="url(#g)"/>
+    <!-- Sparkles glyph (centered) -->
+    <g transform="translate(256 256)" fill="none" stroke="#0a0e1a" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M -36 -100 L -28 -56 L 16 -48 L -28 -40 L -36 4 L -44 -40 L -88 -48 L -44 -56 Z" fill="#0a0e1a"/>
+        <path d="M 60 -20 L 64 0 L 84 4 L 64 8 L 60 28 L 56 8 L 36 4 L 56 0 Z" fill="#0a0e1a"/>
+        <path d="M 4 60 L 8 80 L 28 84 L 8 88 L 4 108 L 0 88 L -20 84 L 0 80 Z" fill="#0a0e1a"/>
+    </g>
+</svg>

@@ -1,0 +1,42 @@
+# RestoPOS
+
+> RestoPOS is a cloud-based, multi-tenant Point-of-Sale (POS) and billing
+> software for restaurants, cafes, bars, cloud kitchens and QSR chains.
+> One web app runs everything from quick billing to a whole multi-branch
+> restaurant chain — browser-based, no install.
+
+RestoPOS helps a restaurant take orders, send them to the kitchen, accept
+payments and generate tax-compliant invoices. It is built for restaurants
+worldwide, with a country-aware tax engine that handles GST (India), VAT
+and sales tax across 30+ countries — and a one-click "CA export" bundle
+for Indian accounting compliance.
+
+## What RestoPOS does
+
+- Fast restaurant billing and GST / VAT / sales-tax-ready tax invoices
+- QR-code table ordering — customers scan to order from their phone
+- Realtime Kitchen Display System (KDS) — orders stream to the kitchen
+- Paytm UPI, card and cash payments, with automatic UPI confirmation
+- Multi-branch / multi-outlet management from one account
+- Customer loyalty, gift cards and coupons
+- Sales analytics and AI-style demand forecasting
+- Inventory and recipe management
+- Offline-capable billing that keeps working if the internet drops
+- One-click CA / accountant export (India)
+
+## Who it is for
+
+Restaurant owners and managers, cafes, bars, dhabas, cloud kitchens,
+quick-service restaurants (QSR), fine-dining venues and multi-outlet
+restaurant chains — in India and internationally. It is positioned as an
+affordable alternative to legacy restaurant POS systems.
+
+## Pricing
+
+Subscription tiers scale by number of outlets and staff seats; a free
+trial is available. Restaurants connect their own payment account
+(Paytm in India, Stripe elsewhere) — the platform holds no money.
+
+## Links
+
+- Home / sign up: the site homepage ( / )
