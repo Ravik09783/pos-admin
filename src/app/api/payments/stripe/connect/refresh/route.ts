@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { appOrigin } from "@/lib/app-origin"
 import { createClient } from "@/lib/supabase/server"
 import { logError } from "@/lib/errors"
 
@@ -20,7 +21,7 @@ const STRIPE_API = "https://api.stripe.com/v1"
 
 export async function GET(req: Request) {
     const secret = process.env.STRIPE_SECRET_KEY
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin
+    const appUrl = appOrigin(req)
     const failureRedirect = `${appUrl}/settings/payments?stripe_error=refresh`
 
     if (!secret) return NextResponse.redirect(failureRedirect)

@@ -662,7 +662,7 @@ function CaExportHero() {
 const SHORTCUTS: Record<UserRole, { href: string; icon: typeof BookOpen; label: string }[]> = {
     OWNER:    [{ href: "/pos", icon: ShoppingCart, label: "POS" }, { href: "/kds", icon: ChefHat, label: "Kitchen" }, { href: "/menu-admin", icon: BookOpen, label: "Menu" }, { href: "/settings/staff", icon: Users, label: "Staff" }],
     MANAGER:  [{ href: "/pos", icon: ShoppingCart, label: "POS" }, { href: "/kds", icon: ChefHat, label: "Kitchen" }, { href: "/menu-admin", icon: BookOpen, label: "Menu" }, { href: "/reports", icon: BarChart3, label: "Reports" }],
-    CASHIER:  [{ href: "/pos", icon: ShoppingCart, label: "POS" }, { href: "/pending-orders", icon: AlertCircle, label: "QR pending" }, { href: "/bills", icon: Receipt, label: "Bills" }, { href: "/customers", icon: Users, label: "Customers" }],
+    CASHIER:  [{ href: "/pos", icon: ShoppingCart, label: "POS" }, { href: "/pending-orders", icon: AlertCircle, label: "QR Orders" }, { href: "/bills", icon: Receipt, label: "Bills" }, { href: "/customers", icon: Users, label: "Customers" }],
     CAPTAIN:  [{ href: "/pos", icon: ShoppingCart, label: "POS" }, { href: "/tables", icon: Building2, label: "Tables" }, { href: "/reservations", icon: CalendarDays, label: "Reservations" }, { href: "/orders", icon: Receipt, label: "Orders" }],
     KITCHEN:  [{ href: "/kds", icon: ChefHat, label: "Kitchen (KDS)" }, { href: "/orders", icon: Receipt, label: "Orders" }],
     AUDITOR:  [{ href: "/reports", icon: BarChart3, label: "Reports" }, { href: "/bills", icon: Receipt, label: "Bills" }, { href: "/accounting", icon: Boxes, label: "Accounting" }],

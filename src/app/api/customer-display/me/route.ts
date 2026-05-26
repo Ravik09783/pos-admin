@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { appOrigin } from "@/lib/app-origin"
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server"
 
 /**
@@ -47,11 +48,10 @@ export async function GET(req: Request) {
     }
 
     // Build the absolute URL the staffer should open on the tablet.
-    // We prefer NEXT_PUBLIC_APP_URL when set (production) but fall back
-    // to the incoming request's origin so dev / preview deploys "just
-    // work" without needing the env var.
-    const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")
-        ?? new URL(req.url).origin
+    // `appOrigin(req)` prefers the request's origin so localhost dev
+    // hands back a localhost URL and production hands back a production
+    // URL — see src/lib/app-origin.ts for the precedence rule.
+    const origin = appOrigin(req)
     const url = `${origin}/display/${encodeURIComponent(tenantSlug)}/${encodeURIComponent(r.display_token)}`
 
     return NextResponse.json({

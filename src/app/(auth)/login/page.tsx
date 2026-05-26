@@ -74,10 +74,16 @@ export default function LoginPage() {
             if (error) throw error
             // Hold the spinner through the navigation. Resetting `busy` to
             // false here would let the button revert to "Sign in" while the
-            // server still renders /dashboard — the user sees a frozen form
+            // server still renders /menu — the user sees a frozen form
             // for ~1s before the redirect. The component unmounts on push,
             // so we never need to flip busy back.
-            router.push("/dashboard")
+            //
+            // Land at /menu — the role-aware launcher grid — instead of
+            // /dashboard, so admin AND staff (cashier, captain, kitchen)
+            // see the same "what would you like to do next" tile set on
+            // sign-in. Admins can still hit Dashboard from the launcher;
+            // staff who never look at numbers don't have to.
+            router.push("/menu")
             router.refresh()
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : "Sign in failed"
@@ -89,6 +95,10 @@ export default function LoginPage() {
     async function loginWithGoogle() {
         const { error } = await supabase.auth.signInWithOAuth({
             provider: "google",
+            // Google → Supabase → back to THIS origin. The origin must be
+            // on the Supabase Auth allow-list (Dashboard → URL
+            // Configuration → Redirect URLs) or Supabase substitutes the
+            // Site URL. See `.env.example` for the recommended setup.
             options: { redirectTo: `${location.origin}/auth/callback` },
         })
         if (error) toast.error(error.message)
@@ -101,6 +111,7 @@ export default function LoginPage() {
             const { error } = await supabase.auth.resend({
                 type: "signup",
                 email: email.trim().toLowerCase(),
+                // Same origin-allowlist caveat as `loginWithGoogle`.
                 options: { emailRedirectTo: `${location.origin}/auth/callback` },
             })
             if (error) throw error

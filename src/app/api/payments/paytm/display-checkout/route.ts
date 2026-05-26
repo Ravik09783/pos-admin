@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { createClient, createServiceRoleClient } from "@/lib/supabase/server"
 import { assertSameOrigin } from "@/lib/csrf"
 import { logError } from "@/lib/errors"
-import { paytmCreateQr, paytmEnvCreds, type PaytmCreds } from "@/lib/billing/paytm"
+import { paytmCreateQr, paytmEnvCreds, resolveTenantPaytmCreds, type PaytmCreds, type TenantPaytmRow } from "@/lib/billing/paytm"
 
 /**
  * POST /api/payments/paytm/display-checkout
@@ -114,35 +114,23 @@ export async function POST(req: Request) {
     // ── 2. Load the tenant's payment configuration ──────────────────────
     const [{ data: gwRow }, { data: tntRow }] = await Promise.all([
         service.from("tenant_payment_gateways")
-            .select("paytm_mid, paytm_merchant_key, paytm_enabled, paytm_env")
+            .select("paytm_mid, paytm_merchant_key, paytm_mid_staging, paytm_merchant_key_staging, paytm_enabled, paytm_env")
             .eq("tenant_id", s.tenant_id).maybeSingle(),
         service.from("tenants")
             .select("upi_id, upi_payee_name, name")
             .eq("id", s.tenant_id).maybeSingle(),
     ])
-    const g = gwRow as {
-        paytm_mid: string | null
-        paytm_merchant_key: string | null
-        paytm_enabled: boolean | null
-        paytm_env: string | null
-    } | null
+    const g = gwRow as TenantPaytmRow | null
     const tnt = tntRow as {
         upi_id: string | null
         upi_payee_name: string | null
         name: string | null
     } | null
 
-    // Paytm credentials — the tenant's own, else the platform .env fallback.
-    let creds: PaytmCreds | null = null
-    if (g?.paytm_enabled && g.paytm_mid && g.paytm_merchant_key) {
-        creds = {
-            env: g.paytm_env === "production" ? "production" : "staging",
-            mid: g.paytm_mid,
-            merchantKey: g.paytm_merchant_key,
-        }
-    } else {
-        creds = paytmEnvCreds()
-    }
+    // Paytm credentials — the tenant's own (picked by env via the
+    // resolver helper), else the platform .env fallback.
+    const creds: PaytmCreds | null =
+        resolveTenantPaytmCreds(g) ?? paytmEnvCreds()
     const upiId = tnt?.upi_id?.trim() || null
     const upiPayee = tnt?.upi_payee_name?.trim() || tnt?.name || "Merchant"
 

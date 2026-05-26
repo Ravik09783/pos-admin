@@ -83,14 +83,14 @@ const CUSTOMER_OPS: UserRole[] = ["OWNER", "MANAGER", "CASHIER"]
 const NAV: NavItem[] = [
     // ── Operations — what the cashier / captain actually touches all day ──
     // Order: Dashboard (home anchor) → POS (the workhorse) → Tables (dine-in
-    // floor) → QR pending (alert badge) → Bills → Orders → Reservations →
+    // floor) → QR Orders (alert badge) → Bills → Orders → Reservations →
     // My collections (end-of-shift). KDS and Availability moved to their
     // own "Kitchen" section so they don't clutter the cashier's view.
     { section: "Operations", href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/announcements", icon: Newspaper, label: "Announcements", badge: "unread-posts", roles: OWNER_MGR },
     { href: "/pos", icon: ShoppingCart, label: "POS", roles: ALL_OPERATIONS },
     { href: "/tables", icon: Building2, label: "Tables", roles: ALL_OPERATIONS },
-    { href: "/pending-orders", icon: AlertCircle, label: "QR pending", badge: "pending", roles: ALL_OPERATIONS },
+    { href: "/pending-orders", icon: AlertCircle, label: "QR Orders", badge: "pending", roles: ALL_OPERATIONS },
     // /orders is now the unified Sales page (orders + bills). The old
     // /bills listing redirects here; /bills/[id] still owns the print view.
     { href: "/orders", icon: Receipt, label: "Sales" }, // everyone (read-only for some)
@@ -104,6 +104,9 @@ const NAV: NavItem[] = [
 
     // ── Catalog — product data only ───────────────────────────────────────
     { section: "Catalog", href: "/menu-admin", icon: BookOpen, label: "Menu", roles: OWNER_MGR },
+    // AI menu extractor — upload a printed menu, OCR-it-in-browser, save.
+    // Owner/Manager only because it writes to menu_items in bulk.
+    { href: "/ai", icon: Sparkles, label: "AI menu import", roles: OWNER_MGR },
     { href: "/inventory", icon: Boxes, label: "Inventory", roles: OWNER_MGR_AUDITOR },
 
     // ── Customers — CRM + every "give the guest a perk" tool in one place.

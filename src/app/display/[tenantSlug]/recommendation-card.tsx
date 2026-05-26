@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Plus, UtensilsCrossed } from "lucide-react"
+import { Heart, Plus, UtensilsCrossed } from "lucide-react"
 
 import { formatCurrency } from "@/lib/utils"
 
@@ -11,7 +11,11 @@ export interface RecSuggestion {
     name: string
     price: number
     image_url: string | null
-    tag: string
+    /** Why we're showing THIS item to THIS customer — the name of the
+     *  cart item the admin paired it with. Surfaced on the card as
+     *  "Pairs with <name>" so the suggestion reads honest and
+     *  data-driven, not as a generic "Chef's pick" sticker. */
+    pairedWith: string
 }
 
 /** A soft four-point sparkle — the motif that makes the card glitter.
@@ -100,12 +104,26 @@ export function RecommendationCardFace({
                     <span className="text-[10px] font-bold uppercase tracking-wide text-white">Add-on</span>
                 </div>
 
-                {/* Tag · name · price, anchored to the foot. */}
+                {/* Reason · name · price, anchored to the foot.
+                  *
+                  * The "Pairs with <X>" chip replaces the old random
+                  * "Popular add-on" / "Chef's pick" sticker. The
+                  * trigger item name comes from the cart item the
+                  * admin paired this recommendation with (curated in
+                  * /menu-admin → Variants & modifiers → recommendations).
+                  * Showing it tells the guest *why* this specific dish
+                  * is on screen for them right now — same data, much
+                  * more credible than a generic sticker. */}
                 <div className="absolute inset-x-0 bottom-0 p-4">
-                    <div className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2 py-0.5 ring-1 ring-amber-300/40">
-                        <Spark className="h-3 w-3 text-amber-300" />
-                        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200">
-                            {suggestion.tag}
+                    <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-amber-400/20 px-2.5 py-1 ring-1 ring-amber-300/40 backdrop-blur-sm">
+                        <Heart
+                            className="h-3 w-3 shrink-0 text-amber-300"
+                            fill="currentColor"
+                            aria-hidden
+                        />
+                        <span className="truncate text-[11px] font-medium leading-none text-amber-50">
+                            Pairs with{" "}
+                            <span className="font-bold text-amber-100">{suggestion.pairedWith}</span>
                         </span>
                     </div>
                     <h3 className="mt-1.5 line-clamp-2 text-xl font-bold leading-tight text-white drop-shadow-sm">

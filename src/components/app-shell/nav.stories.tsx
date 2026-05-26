@@ -74,7 +74,7 @@ const OPERATIONS: NavItemView[] = [
     { section: "Operations", href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/pos", icon: ShoppingCart, label: "POS" },
     { href: "/tables", icon: Building2, label: "Tables" },
-    { href: "/pending-orders", icon: AlertCircle, label: "QR pending", badge: "pending" },
+    { href: "/pending-orders", icon: AlertCircle, label: "QR Orders", badge: "pending" },
     { href: "/bills", icon: Receipt, label: "Bills" },
     { href: "/orders", icon: Receipt, label: "Orders" },
     { href: "/reservations", icon: CalendarDays, label: "Reservations" },
@@ -129,7 +129,7 @@ const meta: Meta<typeof NavBodyView> = {
         docs: {
             description: {
                 component:
-                    "The sidebar navigation list. Filters by role (OWNER/MANAGER see everything; CASHIER/CAPTAIN see operations + customers; KITCHEN sees only KDS + Availability). Active link gets a primary-tinted background. `QR pending` carries a live count badge sourced from `usePendingCount()`, branch-scoped via `useActiveBranch()`.",
+                    "The sidebar navigation list. Filters by role (OWNER/MANAGER see everything; CASHIER/CAPTAIN see operations + customers; KITCHEN sees only KDS + Availability). Active link gets a primary-tinted background. `QR Orders` carries a live count badge sourced from `usePendingCount()`, branch-scoped via `useActiveBranch()`.",
             },
         },
     },

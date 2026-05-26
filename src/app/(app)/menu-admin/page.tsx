@@ -968,13 +968,14 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ArrowRight, Ban, Lightbulb, Loader2, Pencil, Plus, Save, Settings2, Trash2, UtensilsCrossed } from "lucide-react"
+import { ArrowRight, Ban, FolderInput, Lightbulb, Loader2, Pencil, Plus, Save, Settings2, Trash2, UtensilsCrossed } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -1358,6 +1359,19 @@ export default function MenuPage() {
         toast.success(next ? `${it.name} marked sold out` : `${it.name} back in stock`)
     }
 
+    async function moveItemToCategory(it: MenuItem, targetCategoryId: string) {
+        if (targetCategoryId === it.category_id) return
+        const prevCategoryId = it.category_id
+        const targetName = categories.find((c) => c.id === targetCategoryId)?.name ?? "category"
+        setItems((prev) => prev.map((x) => x.id === it.id ? { ...x, category_id: targetCategoryId } : x))
+        const { error } = await supabase.from("menu_items").update({ category_id: targetCategoryId } as never).eq("id", it.id)
+        if (error) {
+            setItems((prev) => prev.map((x) => x.id === it.id ? { ...x, category_id: prevCategoryId } : x))
+            return toast.error(error.message)
+        }
+        toast.success(`${it.name} moved to ${targetName}`)
+    }
+
     // Sale-price inline feedback
     const salePriceFeedback = (() => {
         const base = Number(editing.base_price)
@@ -1459,6 +1473,14 @@ export default function MenuPage() {
                                     "neon-border flex flex-col overflow-hidden shadow-sm",
                                     "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-primary/40",
                                     it.is_sold_out && "opacity-75",
+                                    // Inactive items don't ring up on POS —
+                                    // make that obvious at a glance so an
+                                    // admin who accidentally toggled it off
+                                    // doesn't wonder why their menu has
+                                    // "disappeared" items. Stronger fade +
+                                    // a dashed warning border so it stands
+                                    // apart from a normal active card.
+                                    !it.is_active && !it.is_sold_out && "opacity-70 border-warning/40 border-dashed",
                                 )}
                             >
                                 {/* Image area: always rendered with a fixed 16:9
@@ -1485,7 +1507,17 @@ export default function MenuPage() {
                                         </div>
                                     )}
                                     {!it.is_active && !it.is_sold_out && (
-                                        <Badge variant="warning" className="absolute top-2 right-2 text-[10px]">Inactive</Badge>
+                                        // Full overlay (mirrors the Sold-out
+                                        // pattern) + a "hidden from POS" caption
+                                        // so the admin understands the
+                                        // consequence of the toggle, not just
+                                        // that the row exists.
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-background/70 backdrop-blur-sm">
+                                            <Badge variant="warning" className="text-xs">Inactive</Badge>
+                                            <span className="text-[10px] uppercase tracking-wider text-warning/90 font-semibold">
+                                                Hidden from POS
+                                            </span>
+                                        </div>
                                     )}
                                 </div>
                                 <CardHeader className="pb-2">
@@ -1510,6 +1542,34 @@ export default function MenuPage() {
                                         <Button size="sm" variant="outline" onClick={() => openEdit(it)}>
                                             <Pencil className="h-3.5 w-3.5" /> Edit
                                         </Button>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={categories.length < 2}
+                                                    title={categories.length < 2 ? "Add another category first" : "Move to another category"}
+                                                >
+                                                    <FolderInput className="h-3.5 w-3.5" /> Move
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
+                                                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                                                    Move to category
+                                                </DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
+                                                {categories
+                                                    .filter((c) => c.id !== it.category_id)
+                                                    .map((c) => (
+                                                        <DropdownMenuItem
+                                                            key={c.id}
+                                                            onSelect={() => moveItemToCategory(it, c.id)}
+                                                        >
+                                                            {c.name}
+                                                        </DropdownMenuItem>
+                                                    ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                         <Button
                                             size="sm"
                                             variant={it.is_sold_out ? "destructive" : "ghost"}

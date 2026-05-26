@@ -23,7 +23,7 @@ function DocPanel() {
             <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
                 <li>Plays the chime via <code>playOrderChime()</code>.</li>
                 <li>Fires a Sonner toast with the customer name + table number.</li>
-                <li>Updates the <code>QR pending</code> sidebar badge automatically (via <code>usePendingCount</code>).</li>
+                <li>Updates the <code>QR Orders</code> sidebar badge automatically (via <code>usePendingCount</code>).</li>
             </ol>
             <h3 className="font-semibold">Why two notifiers?</h3>
             <p className="text-muted-foreground">

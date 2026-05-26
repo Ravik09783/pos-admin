@@ -59,6 +59,14 @@ export default function SignupPage() {
                 password,
                 options: {
                     data: { full_name: fullName.trim() },
+                    // Send the confirmation link back to the SAME origin the
+                    // user signed up from (localhost in dev, production in
+                    // prod, preview domain on a preview deploy). For this to
+                    // actually be honoured the origin must be on the
+                    // Supabase Auth → URL Configuration → Redirect URLs
+                    // allow-list — otherwise Supabase silently substitutes
+                    // the project's Site URL. See `.env.example` for the
+                    // recommended allow-list entries.
                     emailRedirectTo: `${location.origin}/auth/callback`,
                 },
             })
@@ -99,6 +107,9 @@ export default function SignupPage() {
             const { error } = await supabase.auth.resend({
                 type: "signup",
                 email: email.trim().toLowerCase(),
+                // Same origin-allowlist caveat as the initial signup —
+                // see the comment on `onSubmit` above and the Supabase
+                // setup notes in `.env.example`.
                 options: { emailRedirectTo: `${location.origin}/auth/callback` },
             })
             if (error) throw error

@@ -24,6 +24,10 @@ export default function ForgotPasswordPage() {
         setBusy(true)
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+                // Reset link lands back on THIS origin's /reset-password.
+                // Requires the origin to be on Supabase Auth → URL
+                // Configuration → Redirect URLs, otherwise Supabase
+                // falls back to the project's Site URL. See `.env.example`.
                 redirectTo: `${location.origin}/reset-password`,
             })
             if (error) throw error

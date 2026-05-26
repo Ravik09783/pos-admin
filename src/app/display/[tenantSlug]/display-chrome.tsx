@@ -84,6 +84,11 @@ interface Suggestion {
     name: string
     price: number
     image_url: string | null
+    /** Name of the cart item that triggered this recommendation — the
+     *  admin paired (cart-item → this) inside `menu_item_recommendations`.
+     *  Surfaced on the card as the "why we picked this for you" line so
+     *  the suggestion reads as data-driven instead of generic. */
+    pairedWith: string
 }
 
 /** The lightweight menu feed used to build upsell suggestions. */
@@ -112,6 +117,12 @@ function computeSuggestions(
     const seen = new Set<string>()
     const out: Suggestion[] = []
     for (const cid of cartIds) {
+        // Look up the trigger item's name so the card can show
+        // "Pairs with <trigger>" — the actual reason this rec exists.
+        // If the cart item isn't in the live menu (deleted mid-shift,
+        // off-menu special) we still allow its pairings to surface
+        // and label the reason "your order" as a graceful fallback.
+        const triggerName = byId.get(cid)?.name ?? "your order"
         for (const rid of feed.recommendations[cid] ?? []) {
             if (cartIds.has(rid) || seen.has(rid)) continue
             const it = byId.get(rid)
@@ -120,7 +131,7 @@ function computeSuggestions(
             const sale = Number(it.sale_price)
             const base = Number(it.base_price)
             const price = it.sale_price != null && sale > 0 && sale < base ? sale : base
-            out.push({ id: it.id, name: it.name, price, image_url: it.image_url })
+            out.push({ id: it.id, name: it.name, price, image_url: it.image_url, pairedWith: triggerName })
             if (out.length >= 3) return out
         }
     }
@@ -153,10 +164,6 @@ const SUGGEST_SUBLINES = [
     "Just ask our staff to add one",
     "Say the word and we'll add it",
 ]
-const ITEM_TAGS = [
-    "Popular add-on", "Crowd favourite", "Chef's pick",
-    "Pairs well", "Fan favourite",
-]
 
 /** A phrase that cycles through a pool — slowly, so it stays calm. */
 function useRotatingPhrase(phrases: string[], intervalMs: number): string {
@@ -173,13 +180,6 @@ function useRotatingPhrase(phrases: string[], intervalMs: number): string {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [key, intervalMs])
     return phrases[idx % phrases.length] ?? phrases[0] ?? ""
-}
-
-/** A stable, varied tag per suggestion item. */
-function tagForItem(id: string): string {
-    let h = 0
-    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
-    return ITEM_TAGS[Math.abs(h) % ITEM_TAGS.length] ?? ITEM_TAGS[0]!
 }
 
 export function CustomerDisplayChrome({
@@ -716,7 +716,7 @@ function SuggestionsPanel({ suggestions, currency }: { suggestions: Suggestion[]
                                     name: active.name,
                                     price: active.price,
                                     image_url: active.image_url,
-                                    tag: tagForItem(active.id),
+                                    pairedWith: active.pairedWith,
                                 }}
                                 currency={currency}
                             />

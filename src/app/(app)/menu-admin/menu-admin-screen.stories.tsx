@@ -1,19 +1,23 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { Edit, Eye, EyeOff, Plus, Search, Trash2 } from "lucide-react"
+import { Edit, Eye, EyeOff, FolderInput, Plus, Search, Trash2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 /**
- * Screen-level twin of the menu admin page (`src/app/(app)/menu/page.tsx`).
+ * Screen-level twin of the menu admin page (`src/app/(app)/menu-admin/page.tsx`).
  * The real page reads categories + items from Supabase, lets the admin
  * inline-edit prices / availability, and pops the ItemAddDialog when
  * adding new items. This story rebuilds the grid + side rail so the
  * states (active, sold-out, paused, on-sale, deleted-but-hidden) can be
  * audited visually.
+ *
+ * Per-card actions: Edit, Move (one-click category re-assignment via a
+ * dropdown of every other category), toggle visible, delete.
  */
 type Item = {
     id: string
@@ -99,6 +103,7 @@ function MenuAdminView({ activeCatId }: MenuAdminViewProps) {
 
 function ItemCard({ item }: { item: Item }) {
     const sale = item.salePrice != null && item.salePrice < item.price
+    const moveTargets = CATEGORIES.filter((c) => c.id !== "all")
     return (
         <Card className={cn(
             "relative overflow-hidden p-3 flex flex-col gap-2",
@@ -130,6 +135,22 @@ function ItemCard({ item }: { item: Item }) {
             </div>
             <div className="flex items-center gap-1 pt-1 border-t border-border/30">
                 <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Edit"><Edit className="h-3.5 w-3.5" /></Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Move to another category" title="Move to another category">
+                            <FolderInput className="h-3.5 w-3.5" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            Move to category
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {moveTargets.map((c) => (
+                            <DropdownMenuItem key={c.id}>{c.name}</DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Toggle visible">
                     {item.isActive ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                 </Button>
@@ -150,7 +171,7 @@ const meta: Meta<typeof MenuAdminView> = {
         docs: {
             description: {
                 component:
-                    "Menu admin page — `/menu`. Category rail on the left, item grid on the right. Each card shows the veg/non-veg flag, sold-out/paused/on-sale badges, both base and sale price, and the GST slab. Inline edit / hide / delete actions on each card. Real page reads from Supabase with optimistic updates; soft-deletes leave the row in place (`deleted_at` set) so historical bills referencing the item still render correctly.",
+                    "Menu admin page — `/menu-admin`. Category rail on the left, item grid on the right. Each card shows the veg/non-veg flag, sold-out/paused/on-sale badges, both base and sale price, and the GST slab. Per-card actions: edit, move to another category (one-click dropdown), toggle visible, delete. Real page reads from Supabase with optimistic updates; soft-deletes leave the row in place (`deleted_at` set) so historical bills referencing the item still render correctly.",
             },
         },
     },

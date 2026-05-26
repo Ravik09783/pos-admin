@@ -65,16 +65,23 @@ export async function POST(req: Request) {
     const supabase = createServiceRoleClient()
 
     // ── 2. Resolve the merchant key for this MID ────────────────────────
-    // Prefer the tenant's own key (tenant_payment_gateways); fall back to
-    // the platform .env creds when the env MID matches — the single-
-    // restaurant / dev-testing path.
+    // The MID could be in EITHER the production pair OR the staging pair
+    // (migration 54 split them). Look in both — Paytm signs the webhook
+    // with the key that pairs with whichever MID is on the row.
     let merchantKey: string | null = null
     const { data: gwRow } = await supabase
         .from("tenant_payment_gateways")
-        .select("paytm_merchant_key")
-        .eq("paytm_mid", mid)
+        .select("paytm_mid, paytm_merchant_key, paytm_mid_staging, paytm_merchant_key_staging")
+        .or(`paytm_mid.eq.${mid},paytm_mid_staging.eq.${mid}`)
         .maybeSingle()
-    merchantKey = (gwRow as { paytm_merchant_key?: string | null } | null)?.paytm_merchant_key ?? null
+    const g = gwRow as {
+        paytm_mid?: string | null
+        paytm_merchant_key?: string | null
+        paytm_mid_staging?: string | null
+        paytm_merchant_key_staging?: string | null
+    } | null
+    if (g?.paytm_mid === mid)         merchantKey = g.paytm_merchant_key ?? null
+    if (!merchantKey && g?.paytm_mid_staging === mid) merchantKey = g.paytm_merchant_key_staging ?? null
     if (!merchantKey) {
         const envCreds = paytmEnvCreds()
         if (envCreds && envCreds.mid === mid) merchantKey = envCreds.merchantKey

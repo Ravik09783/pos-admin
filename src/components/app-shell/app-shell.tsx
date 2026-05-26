@@ -40,6 +40,10 @@ interface AppShellProps {
     tenantLogoUrl: string | null
     userName: string
     userEmail: string
+    /** Optional avatar shown on the topbar trigger. Null = falls back
+     *  to a generic User icon. Powered by `public.users.avatar_url`
+     *  which the user updates via /settings/profile. */
+    userAvatarUrl?: string | null
     role: UserRole
     /** True when the signed-in account's email is on the
      *  RESTOPOS_SUPER_ADMIN_EMAILS list. Used by the topbar to show a
@@ -109,6 +113,7 @@ export function AppShell(props: AppShellProps) {
                 tenantLogoUrl={props.tenantLogoUrl}
                 userName={props.userName}
                 userEmail={props.userEmail}
+                userAvatarUrl={props.userAvatarUrl ?? null}
                 role={props.role}
                 isSuperAdmin={props.isSuperAdmin}
             />

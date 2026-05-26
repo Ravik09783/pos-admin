@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
 
+import { appOrigin } from "@/lib/app-origin"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { logError, logWarn } from "@/lib/errors"
 import { resolveGateway, type PaymentGateway } from "@/lib/payments/gateway"
-import { paytmCreateQr, paytmEnvCreds, type PaytmCreds } from "@/lib/billing/paytm"
+import { paytmCreateQr, paytmEnvCreds, resolveTenantPaytmCreds, type PaytmCreds, type TenantPaytmRow } from "@/lib/billing/paytm"
 import { getClientIp, rateLimit } from "@/lib/rate-limit"
 
 interface PlaceOrderBody {
@@ -151,26 +152,14 @@ export async function POST(req: Request) {
     if (gateway === "paytm") {
         const { data: gw } = await supabase
             .from("tenant_payment_gateways")
-            .select("paytm_mid, paytm_merchant_key, paytm_enabled, paytm_env")
+            .select("paytm_mid, paytm_merchant_key, paytm_mid_staging, paytm_merchant_key_staging, paytm_enabled, paytm_env")
             .eq("tenant_id", t.id)
             .maybeSingle()
-        const g = gw as {
-            paytm_mid: string | null
-            paytm_merchant_key: string | null
-            paytm_enabled: boolean | null
-            paytm_env: string | null
-        } | null
-        if (g?.paytm_enabled && g.paytm_mid && g.paytm_merchant_key) {
-            paytmCreds = {
-                env: g.paytm_env === "production" ? "production" : "staging",
-                mid: g.paytm_mid,
-                merchantKey: g.paytm_merchant_key,
-            }
-        } else {
-            // No per-tenant Paytm → platform .env fallback (dev / single
-            // restaurant). Null when the platform hasn't set one either.
-            paytmCreds = paytmEnvCreds()
-        }
+        // Helper picks production vs staging credentials based on
+        // `paytm_env`. Falls back to the platform .env pair when the
+        // tenant doesn't have a connected Paytm.
+        paytmCreds =
+            resolveTenantPaytmCreds(gw as TenantPaytmRow | null) ?? paytmEnvCreds()
         if (!paytmCreds) {
             if (!t.upi_id) {
                 return NextResponse.json({
@@ -454,7 +443,7 @@ export async function POST(req: Request) {
         // supported settlements; we lean on locale-config to do that mapping.
         const currency = (t.currency ?? "USD").toLowerCase()
 
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+        const appUrl = appOrigin(req)
         const params = new URLSearchParams()
         params.append("mode", "payment")
         params.append("line_items[0][price_data][currency]", currency)

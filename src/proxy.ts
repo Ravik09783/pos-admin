@@ -20,8 +20,10 @@ import { createMiddlewareClient } from "@/lib/supabase/middleware"
  *    routes, the layout already does getUser" reasoning was the bug.
  *
  * 2. AUTHED-VISITOR BOUNCE — a signed-in visitor landing on /, /login or
- *    /signup is redirected to /dashboard, so those pages stay static
- *    prerenders instead of doing the check in-route.
+ *    /signup is redirected to /menu, so those pages stay static
+ *    prerenders instead of doing the check in-route. /menu is the
+ *    role-aware launcher grid — admin AND staff get the same landing
+ *    surface on sign-in (admins still have Dashboard one click away).
  *
  * 3. SUBSCRIPTION LOCKOUT — when a tenant's trial is over and there's no
  *    active subscription, the app is paywalled: EVERY signed-in member
@@ -102,10 +104,11 @@ export async function proxy(req: NextRequest) {
             }
         }
 
-        // Signed-in visitor on /, /login or /signup → send to dashboard.
+        // Signed-in visitor on /, /login or /signup → send to /menu (the
+        // role-aware launcher).
         if (user && BOUNCE_WHEN_AUTHED.includes(pathname)) {
             const url = req.nextUrl.clone()
-            url.pathname = "/dashboard"
+            url.pathname = "/menu"
             return NextResponse.redirect(url)
         }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { appOrigin } from "@/lib/app-origin"
 import { createClient } from "@/lib/supabase/server"
 import { assertSameOrigin } from "@/lib/csrf"
 import { logError } from "@/lib/errors"
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
     if (!process.env.STRIPE_SECRET_KEY) {
         return NextResponse.json({ error: "Stripe not configured" }, { status: 500 })
     }
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin
+    const appUrl = appOrigin(req)
 
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

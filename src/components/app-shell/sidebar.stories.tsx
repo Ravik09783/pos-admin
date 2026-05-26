@@ -31,7 +31,7 @@ const FULL_NAV: NavItemView[] = [
     { section: "Operations", href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/pos", icon: ShoppingCart, label: "POS" },
     { href: "/tables", icon: Building2, label: "Tables" },
-    { href: "/pending-orders", icon: AlertCircle, label: "QR pending", badge: "pending" },
+    { href: "/pending-orders", icon: AlertCircle, label: "QR Orders", badge: "pending" },
     { href: "/bills", icon: Receipt, label: "Bills" },
     { href: "/orders", icon: Receipt, label: "Orders" },
     { href: "/reservations", icon: CalendarDays, label: "Reservations" },

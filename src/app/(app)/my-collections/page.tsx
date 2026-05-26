@@ -12,7 +12,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ArrowDown, ArrowUp, Banknote, CheckCircle2, Coins, Globe, RefreshCw, Sparkles, Wallet } from "lucide-react"
+import Link from "next/link"
+import { ArrowDown, ArrowUp, Banknote, CheckCircle2, Clock, Coins, ExternalLink, Globe, RefreshCw, Sparkles, Wallet } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -23,11 +24,25 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/app-shell/page-header"
 import { createClient } from "@/lib/supabase/client"
-import { scopeQueryToBranch, useActiveBranch } from "@/lib/branch/active-branch"
+import { useActiveBranch } from "@/lib/branch/active-branch"
 import { getTaxConfig } from "@/lib/tax/locale-config"
-import { cashVariance, GROUP_LABEL, groupOf, summarise, summariseByStaff, type PaymentRow } from "@/lib/reports/shift-summary"
+import { METHOD_LABEL, cashVariance, GROUP_LABEL, groupOf, summarise, summariseByStaff, type PaymentRow } from "@/lib/reports/shift-summary"
 import { cn, formatCurrency } from "@/lib/utils"
 import type { UserRole } from "@/types/database"
+
+/** Same `PaymentRow` but with the embedded bill (PostgREST returns
+ *  the FK join as either an object or a single-element array — we
+ *  accept both). Used to render the bill's invoice number as a link
+ *  in the transaction history. */
+type PaymentRowWithBill = PaymentRow & {
+    bill?: { invoice_number: string | null } | { invoice_number: string | null }[] | null
+}
+function billNumberOf(p: PaymentRowWithBill): string | null {
+    const b = p.bill
+    if (!b) return null
+    const single = Array.isArray(b) ? b[0] ?? null : b
+    return single?.invoice_number ?? null
+}
 
 type ScopeTab = "mine" | "team"
 
@@ -46,7 +61,7 @@ export default function MyCollectionsPage() {
     const supabase = createClient()
     const [date, setDate] = useState<string>(today())
     const [me, setMe] = useState<{ id: string; name: string; role: UserRole; tenant_id: string; currency: string } | null>(null)
-    const [rows, setRows] = useState<PaymentRow[]>([])
+    const [rows, setRows] = useState<PaymentRowWithBill[]>([])
     const [staffNames, setStaffNames] = useState<Record<string, string>>({})
     const [loading, setLoading] = useState(true)
     const [scope, setScope] = useState<ScopeTab>("mine")
@@ -75,26 +90,38 @@ export default function MyCollectionsPage() {
             // Fetch all payments in tenant for the day. RLS already scopes
             // by tenant — we filter here by date range AND by active
             // branch (migration 21 added payments.branch_id, back-filled
-            // from each parent bill).
+            // from each parent bill; migration 40 added a BEFORE INSERT
+            // trigger that auto-stamps it going forward).
+            //
+            // Branch filter is INCLUSIVE of NULL: a payment with
+            // branch_id = null is "ambient" — it pre-dates the back-fill
+            // or some future code path forgot to stamp it. Excluding
+            // those silently zeroes the report (the exact bug migration
+            // 40 was written for). Including them means a single-branch
+            // operator still sees their money even on an un-migrated DB.
+            // For an "All branches" view (activeBranchId === null) we
+            // skip the filter entirely.
             //
             // Typed as `any` to prevent "type instantiation is excessively
             // deep" — Supabase's chained generics exceed TS's recursion
-            // limit once scopeQueryToBranch is applied on top.
+            // limit once the OR/eq is applied on top.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let paysQ: any = supabase
                 .from("payments")
-                .select("id, method, amount, received_by, bill_id, created_at")
+                .select("id, method, amount, received_by, bill_id, branch_id, created_at, bill:bills(invoice_number)")
                 .eq("tenant_id", r.tenant_id)
                 .gte("created_at", startOfDayISO(date))
                 .lte("created_at", endOfDayISO(date))
                 .order("created_at", { ascending: false })
-            paysQ = scopeQueryToBranch(paysQ, activeBranchId)
+            if (activeBranchId !== null) {
+                paysQ = paysQ.or(`branch_id.eq.${activeBranchId},branch_id.is.null`)
+            }
             const { data: pays, error } = await paysQ
             if (error) {
                 toast.error(error.message)
                 setRows([])
             } else {
-                setRows((pays ?? []) as PaymentRow[])
+                setRows((pays ?? []) as PaymentRowWithBill[])
             }
 
             // For the team view, resolve staff names. Skip if non-admin
@@ -118,7 +145,7 @@ export default function MyCollectionsPage() {
     useEffect(() => { refresh() }, [refresh])
 
     // Slices used by the two tabs.
-    const myRows = useMemo(
+    const myRows = useMemo<PaymentRowWithBill[]>(
         () => (me ? rows.filter((p) => p.received_by === me.id) : []),
         [rows, me],
     )
@@ -171,6 +198,7 @@ export default function MyCollectionsPage() {
                 <MineView
                     money={money}
                     summary={mySummary}
+                    rows={myRows}
                     cashExpected={cashExpected}
                     counted={counted}
                     setCounted={setCounted}
@@ -178,7 +206,13 @@ export default function MyCollectionsPage() {
                     youName={me?.name ?? "You"}
                 />
             ) : (
-                <TeamView money={money} summary={teamSummary} perStaff={perStaff} />
+                <TeamView
+                    money={money}
+                    summary={teamSummary}
+                    perStaff={perStaff}
+                    rows={rows}
+                    staffNames={staffNames}
+                />
             )}
         </div>
     )
@@ -186,10 +220,11 @@ export default function MyCollectionsPage() {
 
 // ── My shift ────────────────────────────────────────────────────────────
 function MineView({
-    money, summary, cashExpected, counted, setCounted, variance, youName,
+    money, summary, rows, cashExpected, counted, setCounted, variance, youName,
 }: {
     money: (v: number) => string
     summary: ReturnType<typeof summarise>
+    rows: PaymentRowWithBill[]
     cashExpected: number
     counted: string
     setCounted: (v: string) => void
@@ -272,18 +307,25 @@ function MineView({
                 </CardContent>
             </Card>
 
-            <BreakdownTable summary={summary} money={money} title="By payment method" />
+            <PaymentHistory
+                rows={rows}
+                money={money}
+                title="Today's payments"
+                description="Every payment you took today, newest first. Tap the invoice link to open the bill."
+            />
         </div>
     )
 }
 
 // ── Team summary ────────────────────────────────────────────────────────
 function TeamView({
-    money, summary, perStaff,
+    money, summary, perStaff, rows, staffNames,
 }: {
     money: (v: number) => string
     summary: ReturnType<typeof summarise>
     perStaff: ReturnType<typeof summariseByStaff>
+    rows: PaymentRowWithBill[]
+    staffNames: Record<string, string>
 }) {
     return (
         <div className="space-y-6">
@@ -347,7 +389,14 @@ function TeamView({
                 </CardContent>
             </Card>
 
-            <BreakdownTable summary={summary} money={money} title="Across the whole team — by payment method" />
+            <PaymentHistory
+                rows={rows}
+                money={money}
+                title="Today's payments"
+                description="Chronological log of every payment from every cashier today."
+                staffNames={staffNames}
+                showStaff
+            />
         </div>
     )
 }
@@ -375,29 +424,120 @@ function KpiCard({ icon, label, value, sub, accent }:
     )
 }
 
-function BreakdownTable({ summary, money, title }: {
-    summary: ReturnType<typeof summarise>
+/** Map a payment group to a badge variant. Mirrors the KPI colours
+ *  up top so the eye can scan the history and intuit the cash/online
+ *  split without reading every row. */
+function methodBadgeVariant(method: PaymentRow["method"]): "success" | "default" | "warning" | "outline" {
+    const g = groupOf(method)
+    if (g === "cash") return "success"
+    if (g === "online") return "default"
+    if (g === "other") return "warning"
+    return "outline"
+}
+
+function formatTime(iso: string): string {
+    try {
+        const d = new Date(iso)
+        return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    } catch {
+        return ""
+    }
+}
+
+/**
+ * Chronological log of payments — replaces the old "By payment
+ * method" rollup which duplicated the KPI cards above. Each row is
+ * one payment with the time, method, amount, and a link to the bill
+ * if there is one. On the team view we add a "by <staff>" column so
+ * an admin can see exactly who collected what.
+ */
+function PaymentHistory({
+    rows, money, title, description, staffNames, showStaff = false,
+}: {
+    rows: PaymentRowWithBill[]
     money: (v: number) => string
     title: string
+    description?: string
+    staffNames?: Record<string, string>
+    showStaff?: boolean
 }) {
     return (
         <Card>
-            <CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader>
+            <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between gap-3 flex-wrap text-base">
+                    <span className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        {title}
+                    </span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                        {rows.length} {rows.length === 1 ? "payment" : "payments"}
+                    </span>
+                </CardTitle>
+                {description && <CardDescription>{description}</CardDescription>}
+            </CardHeader>
             <CardContent>
-                {summary.methods.length === 0 ? (
+                {rows.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No payments yet for this day.</p>
                 ) : (
-                    <div className="space-y-1.5">
-                        {summary.methods.map((m) => (
-                            <div key={m.method} className="flex items-center justify-between gap-3 px-3 py-2 rounded-md hover:bg-card/40">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <span className="font-medium">{m.label}</span>
-                                    <Badge variant="outline" className="text-[10px]">{GROUP_LABEL[groupOf(m.method)]}</Badge>
-                                    <span className="text-xs text-muted-foreground">× {m.count}</span>
-                                </div>
-                                <div className="font-mono tabular-nums">{money(m.amount)}</div>
-                            </div>
-                        ))}
+                    <div className="overflow-x-auto -mx-2">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-xs uppercase tracking-wider text-muted-foreground">
+                                    <th className="text-left py-2 px-2 font-medium">Time</th>
+                                    <th className="text-left py-2 px-2 font-medium">Method</th>
+                                    <th className="text-left py-2 px-2 font-medium">Bill</th>
+                                    {showStaff && <th className="text-left py-2 px-2 font-medium">By</th>}
+                                    <th className="text-right py-2 px-2 font-medium">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rows.map((p) => {
+                                    const amt = typeof p.amount === "string" ? Number(p.amount) : p.amount
+                                    const inv = billNumberOf(p)
+                                    const staff = p.received_by
+                                        ? (staffNames?.[p.received_by] ?? "Staff")
+                                        : "Auto"
+                                    return (
+                                        <tr key={p.id} className="border-t border-border/30 hover:bg-card/40">
+                                            <td className="py-2 px-2 tabular-nums text-muted-foreground whitespace-nowrap">
+                                                {formatTime(p.created_at)}
+                                            </td>
+                                            <td className="py-2 px-2">
+                                                <Badge variant={methodBadgeVariant(p.method)} className="text-[10px] font-medium">
+                                                    {METHOD_LABEL[p.method] ?? p.method}
+                                                </Badge>
+                                                <span className="ml-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                                                    {GROUP_LABEL[groupOf(p.method)]}
+                                                </span>
+                                            </td>
+                                            <td className="py-2 px-2">
+                                                {p.bill_id ? (
+                                                    <Link
+                                                        href={`/bills/${p.bill_id}`}
+                                                        className="inline-flex items-center gap-1 text-primary hover:underline font-mono text-xs"
+                                                    >
+                                                        {inv ?? "Open"} <ExternalLink className="h-3 w-3" />
+                                                    </Link>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">—</span>
+                                                )}
+                                            </td>
+                                            {showStaff && (
+                                                <td className={cn(
+                                                    "py-2 px-2 text-xs",
+                                                    p.received_by ? "text-foreground" : "text-muted-foreground italic",
+                                                )}>
+                                                    {staff}
+                                                </td>
+                                            )}
+                                            <td className="py-2 px-2 text-right tabular-nums font-mono font-medium whitespace-nowrap">
+                                                {Number.isFinite(amt) ? money(amt) : "—"}
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </CardContent>

@@ -1,15 +1,25 @@
 import type { Metadata } from "next"
+import { redirect } from "next/navigation"
 
+import { getCurrentUserAndTenant } from "@/lib/auth/current-user"
 import { LandingPage } from "./_landing/landing"
 import {
     SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION,
     SITE_KEYWORDS, SITE_FEATURES, SITE_FAQ,
 } from "@/lib/site"
 
-// `proxy.ts` handles "logged-in user lands on / → bounce to /dashboard"
-// before this component ever renders, so the page itself is a pure
-// server component with zero data access — fully prerenderable, which is
-// exactly what a search-indexed marketing page wants.
+// `proxy.ts` is the PRIMARY guard for "logged-in user lands on / →
+// bounce to /menu" — it runs on every request and is supposed to
+// catch this before the page renders. But middleware can quietly
+// fail-open (missing env, Supabase auth blip, edge-runtime cache
+// quirk) and a signed-in user would then see the public landing
+// page, which is confusing and exposes marketing copy + sign-up CTAs
+// to an already-authed user. Adding a server-side `getUser()` here
+// is the belt-and-suspenders: it costs one extra auth round-trip on
+// the public `/` for guests (a few ms) and returns a redirect for
+// authed users, with no chance of cache leakage. The page is still
+// fully prerenderable for unauthenticated crawlers (Google, etc.) —
+// they get the JSON-LD + the landing page just like before.
 //
 // This `/` route is the ONLY public, indexable page (see robots.ts). All
 // the SEO weight — title, description, keywords, OpenGraph, Twitter card,
@@ -119,7 +129,12 @@ const jsonLd = {
     ],
 }
 
-export default function Home() {
+export default async function Home() {
+    // Defense-in-depth: if the proxy didn't catch this (fail-open path),
+    // server-side redirect authed users to the launcher.
+    const { user } = await getCurrentUserAndTenant()
+    if (user) redirect("/menu")
+
     return (
         <>
             <script

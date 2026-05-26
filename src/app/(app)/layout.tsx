@@ -107,6 +107,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 tenantLogoUrl={tenant?.logo_url ?? null}
                 userName={appUser.full_name ?? ""}
                 userEmail={appUser.email ?? user.email ?? ""}
+                userAvatarUrl={appUser.avatar_url ?? null}
                 role={appUser.role as UserRole}
                 isSuperAdmin={isSuperAdmin(user)}
             >

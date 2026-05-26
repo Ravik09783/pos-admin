@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { logError, logInfo } from "@/lib/errors"
-import { paytmEnvCreds, paytmTransactionStatus, type PaytmCreds } from "@/lib/billing/paytm"
+import { paytmEnvCreds, paytmTransactionStatus, resolveTenantPaytmCreds, type PaytmCreds, type TenantPaytmRow } from "@/lib/billing/paytm"
 import { finalizePaytmPayment } from "@/lib/billing/paytm-confirm"
 
 /**
@@ -84,22 +84,12 @@ export async function GET(req: Request) {
         if (creds === undefined) {
             const { data: gw } = await service
                 .from("tenant_payment_gateways")
-                .select("paytm_mid, paytm_merchant_key, paytm_enabled, paytm_env")
+                .select("paytm_mid, paytm_merchant_key, paytm_mid_staging, paytm_merchant_key_staging, paytm_enabled, paytm_env")
                 .eq("tenant_id", ev.tenant_id)
                 .maybeSingle()
-            const g = gw as {
-                paytm_mid: string | null
-                paytm_merchant_key: string | null
-                paytm_enabled: boolean | null
-                paytm_env: string | null
-            } | null
-            creds = (g?.paytm_enabled && g.paytm_mid && g.paytm_merchant_key)
-                ? {
-                    env: g.paytm_env === "production" ? "production" : "staging",
-                    mid: g.paytm_mid,
-                    merchantKey: g.paytm_merchant_key,
-                }
-                : paytmEnvCreds()
+            // Helper picks the right pair (production vs staging) per
+            // `paytm_env`; falls back to platform .env creds.
+            creds = resolveTenantPaytmCreds(gw as TenantPaytmRow | null) ?? paytmEnvCreds()
             credsByTenant.set(ev.tenant_id, creds)
         }
         if (!creds) { errored++; continue }

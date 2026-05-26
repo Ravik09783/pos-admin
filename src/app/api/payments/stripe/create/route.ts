@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { appOrigin } from "@/lib/app-origin"
 import { createClient } from "@/lib/supabase/server"
 import { assertSameOrigin } from "@/lib/csrf"
 import { logError } from "@/lib/errors"
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
     if (!origin.ok) return NextResponse.json({ error: origin.reason }, { status: 403 })
 
     const secret = process.env.STRIPE_SECRET_KEY
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+    const appUrl = appOrigin(req)
     if (!secret) return NextResponse.json({ error: "Stripe not configured" }, { status: 500 })
 
     const supabase = await createClient()

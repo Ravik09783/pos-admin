@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ItemAddDialog } from "@/components/pos/item-add-dialog"
 import { PageTour } from "@/components/tours/page-tour"
 import { TourReplayButton } from "@/components/tours/tour-replay-button"
+import { findCustomerByPhone as findCustomerByPhoneShared, isPhoneShaped as isPhoneShapedShared } from "@/lib/customers/lookup"
 import {
     CheckoutPreviewDialog,
     type CheckoutCustomerDetails,
@@ -155,6 +156,12 @@ export default function POSPage() {
     // reason (Paytm rejected it, nothing configured, …) so the dialog can
     // tell the cashier plainly instead of spinning on "Preparing…".
     const [checkoutQrError, setCheckoutQrError] = useState<string | null>(null)
+    // Why the QR is the MANUAL-UPI fallback rather than the Paytm
+    // dynamic QR (which auto-confirms via webhook). Null when Paytm
+    // was the path taken or no Paytm was configured. Surfaced on the
+    // checkout dialog so the cashier knows it'll be a UTR-paste flow
+    // and why — not a generic "no info, just enter the ref".
+    const [paytmFallbackReason, setPaytmFallbackReason] = useState<string | null>(null)
     // Guards the Paytm display-checkout route from double-firing for the
     // same checkout session (React strict-mode / re-renders).
     const paytmCheckoutFiredRef = useRef<string | null>(null)
@@ -1139,6 +1146,7 @@ export default function POSPage() {
             // Cash / Card — no scan QR. Stamp the sentinel so the customer
             // screen shows the right prompt; clears any earlier UPI QR.
             setPaytmAutoConfirm(false)
+            setPaytmFallbackReason(null)
             setCheckoutQr(null)
             setCheckoutQrError(null)
             paytmCheckoutFiredRef.current = null
@@ -1177,6 +1185,11 @@ export default function POSPage() {
             let sessionRef: string | null = null
             let notConfigured = false
             let transportErr: string | null = null
+            // Why the route fell back to manual UPI (if it did) — null
+            // when Paytm succeeded OR when Paytm wasn't configured at
+            // all. Surfaces on the cashier dialog as a small "Paytm
+            // failed, using fallback" note next to the QR.
+            let fallbackReason: string | null = null
             try {
                 const r = await fetch("/api/payments/paytm/display-checkout", {
                     method: "POST",
@@ -1187,11 +1200,19 @@ export default function POSPage() {
                     ok?: boolean; qr_data?: string; auto_confirm?: boolean
                     checkout_session_id?: string | null
                     reason?: string; error?: string; detail?: string
+                    paytm_error?: string | null
+                    mode?: string
                 } | null
                 if (r.ok && b?.ok && typeof b.qr_data === "string") {
                     qrData = b.qr_data
                     autoConfirm = !!b.auto_confirm
                     sessionRef = b.checkout_session_id ?? null
+                    // We got a QR back — if the route fell through from
+                    // a failed Paytm attempt to the manual-UPI path, it
+                    // included `paytm_error`. Stash the reason so the
+                    // cashier dialog can explain why it's a UTR-paste
+                    // flow instead of the auto-confirm one.
+                    fallbackReason = (!autoConfirm && b.paytm_error) ? b.paytm_error : null
                 } else if (r.ok && b?.ok === false && b?.reason === "not_configured") {
                     notConfigured = true
                 } else {
@@ -1208,6 +1229,7 @@ export default function POSPage() {
             if (qrData) {
                 setCheckoutQr(qrData)
                 setPaytmAutoConfirm(autoConfirm)
+                setPaytmFallbackReason(fallbackReason)
                 // The POS owns the checkout_url write — gated on the live
                 // method above — so the customer screen shows exactly this
                 // QR. AWAITED (a bare `void builder` never sends the
@@ -1221,6 +1243,7 @@ export default function POSPage() {
             } else {
                 setCheckoutQr(null)
                 setPaytmAutoConfirm(false)
+                setPaytmFallbackReason(null)
                 setCheckoutQrError(
                     notConfigured
                         ? "The owner hasn't set up a payment method yet — add Paytm or a UPI ID to accept UPI."
@@ -1245,6 +1268,7 @@ export default function POSPage() {
         if (!checkoutOpen) {
             paytmCheckoutFiredRef.current = null
             setPaytmAutoConfirm(false)
+            setPaytmFallbackReason(null)
             setCheckoutQr(null)
             setCheckoutQrError(null)
             setCheckoutMethod("CASH")
@@ -1299,6 +1323,7 @@ export default function POSPage() {
                     setCustomerPhone("")
                     setCheckoutDetails({ name: "", phone: "", email: "" })
                     setPaytmAutoConfirm(false)
+                    setPaytmFallbackReason(null)
                     setRecoveredSale(null)
                     paytmCheckoutFiredRef.current = null
                     syncDisplaySession(null)
@@ -1434,29 +1459,12 @@ export default function POSPage() {
     }
     function removeGiftCard() { setAppliedGiftCard(null) }
 
-    /** True when the input looks like a phone — at least 7 digits,
-     *  optional leading '+'. We use this to gate the auto-lookup so we
-     *  don't fire a Supabase query after every keystroke on "9876". */
-    function isPhoneShaped(raw: string): boolean {
-        return /^\+?\d{7,15}$/.test(raw.replace(/[\s-]/g, ""))
-    }
-
-    /** Read-only lookup. Returns the customer row or null. Used by both
-     *  the debounced auto-call (no creation) and the manual Find/Add
-     *  button (which creates a row on miss). */
-    async function findCustomerByPhone(
-        phone: string,
-    ): Promise<{ id: string; name: string | null; loyalty_points: number; loyalty_tier: string } | null> {
-        const trimmed = phone.trim()
-        if (!trimmed) return null
-        const { data } = await supabase
-            .from("customers")
-            .select("id, name, loyalty_points, loyalty_tier")
-            .eq("phone", trimmed)
-            .is("deleted_at", null)
-            .maybeSingle()
-        return (data as { id: string; name: string | null; loyalty_points: number; loyalty_tier: string } | null) ?? null
-    }
+    // Phone-shape + lookup helpers live in src/lib/customers/lookup.ts
+    // now that the checkout dialog also needs them. Local aliases keep
+    // the existing call-sites in this file untouched.
+    const isPhoneShaped = isPhoneShapedShared
+    const findCustomerByPhone = (phone: string) =>
+        findCustomerByPhoneShared(supabase, phone)
 
     // ── Debounced auto-lookup ────────────────────────────────────────
     // Cashier types a phone → wait 400ms after they stop → fire the
@@ -2613,6 +2621,7 @@ export default function POSPage() {
                 generationStage={generationStage}
                 qrPayload={checkoutQr}
                 qrError={checkoutQrError}
+                paytmFallbackReason={paytmFallbackReason}
                 canSetupPayments={userRole === "OWNER" || userRole === "MANAGER"}
                 couponBusy={couponBusy}
                 giftCardBusy={giftCardBusy}

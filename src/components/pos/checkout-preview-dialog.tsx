@@ -5,11 +5,14 @@ import Link from "next/link"
 import QRCode from "qrcode"
 import { AlertTriangle, Banknote, CheckCircle2, CreditCard, Loader2, QrCode, Receipt, Smartphone, Tag, X, Zap } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { findCustomerByPhone, isPhoneShaped } from "@/lib/customers/lookup"
+import { createClient } from "@/lib/supabase/client"
 import { cn, formatCurrency } from "@/lib/utils"
 import type { OrderTotals } from "@/lib/gst/calculator"
 import type { MenuItem, OrderType } from "@/types/database"
@@ -101,6 +104,7 @@ export function CheckoutPreviewDialog({
     onCustomerDetailsChange,
     onPaymentMethodChange,
     paytmAutoConfirm = false,
+    paytmFallbackReason = null,
 }: {
     open: boolean
     cart: CartLine[]
@@ -172,6 +176,14 @@ export function CheckoutPreviewDialog({
      *  webhook when the customer pays — so the dialog swaps the manual
      *  "Generate invoice" button for a "Waiting for payment" state. */
     paytmAutoConfirm?: boolean
+    /** Why we ended up on the manual-UPI QR instead of the Paytm
+     *  dynamic one. Non-null only when Paytm was configured AND
+     *  attempted AND failed — the server returns the Paytm error
+     *  text. Shown as a small amber note next to the QR so the
+     *  cashier understands why they need to paste the UTR. Null
+     *  when there was no Paytm to begin with, or when Paytm
+     *  succeeded. */
+    paytmFallbackReason?: string | null
 }) {
     const [noGst, setNoGst] = useState(defaultNoTax)
     const [name, setName] = useState("")
@@ -179,6 +191,17 @@ export function CheckoutPreviewDialog({
     const [email, setEmail] = useState("")
     const [couponInput, setCouponInput] = useState("")
     const [giftCardInput, setGiftCardInput] = useState("")
+    // Phone-keyed customer auto-fill. When the cashier types a phone
+    // and we find a matching row, we stash the trimmed phone here so
+    // we know "name + email are currently auto-filled for THIS phone".
+    // The instant phone diverges from this value, the auto-filled
+    // fields get wiped — protects against a previous customer's
+    // details lingering attached to a new sale. Null = no auto-fill
+    // active (the cashier is typing fresh details by hand).
+    const [autoFilledForPhone, setAutoFilledForPhone] = useState<string | null>(null)
+    const [lookupBusy, setLookupBusy] = useState(false)
+    const [lookupName, setLookupName] = useState<string | null>(null)
+    const supabase = useMemo(() => createClient(), [])
     const isIndia = countryCode.toUpperCase() === "IN"
     /** Visible method buttons. UPI is hidden outside India regardless of
      *  tenant settings — Google Pay overseas runs on cards via Stripe, not
@@ -210,7 +233,72 @@ export function CheckoutPreviewDialog({
         setPayments([{ method: "CASH", amount: "", reference: "" }])
         // Reset to the tenant's "charge tax on bills" default each open.
         setNoGst(defaultNoTax)
+        // If we got a pre-attached customer with a phone, treat it as
+        // already auto-filled FOR THAT PHONE — so editing the phone
+        // here still triggers the wipe + re-lookup path. Without this,
+        // the cashier could leave a stale name/email attached just by
+        // changing the phone in the dialog after the POS-side lookup
+        // already filled them.
+        setAutoFilledForPhone(customer?.phone?.trim() || null)
+        setLookupName(customer?.name ?? null)
+        setLookupBusy(false)
     }, [open, customer, defaultNoTax])
+
+    // Phone → customer auto-fill, debounced. THIS is the "while billing,
+    // type phone → name + email get filled" behaviour. When the cashier
+    // edits the phone again AFTER an auto-fill, the auto-filled fields
+    // are wiped so a previous customer's details can't ride along on a
+    // new sale.
+    useEffect(() => {
+        if (!open) return
+        const trimmed = phone.trim()
+
+        // Phone changed after a successful auto-fill → wipe the
+        // auto-filled fields immediately. We do this BEFORE the
+        // debounced lookup so the stale name/email never lingers
+        // even for a few hundred milliseconds.
+        if (autoFilledForPhone && trimmed !== autoFilledForPhone) {
+            setName("")
+            setEmail("")
+            setAutoFilledForPhone(null)
+            setLookupName(null)
+        }
+
+        if (!trimmed || !isPhoneShaped(trimmed)) {
+            setLookupBusy(false)
+            return
+        }
+        // Already filled for this exact phone — nothing more to do.
+        if (autoFilledForPhone === trimmed) return
+
+        setLookupBusy(true)
+        let cancelled = false
+        const handle = window.setTimeout(async () => {
+            try {
+                const found = await findCustomerByPhone(supabase, trimmed)
+                if (cancelled) return
+                if (found) {
+                    // Only overwrite name/email when the row carries a
+                    // value — never blow away a cashier-typed value
+                    // with an empty DB string.
+                    if (found.name) setName(found.name)
+                    if (found.email) setEmail(found.email)
+                    setAutoFilledForPhone(trimmed)
+                    setLookupName(found.name ?? "Customer")
+                } else {
+                    setLookupName(null)
+                }
+            } catch {
+                /* RLS / network error — silent; manual entry still works */
+            } finally {
+                if (!cancelled) setLookupBusy(false)
+            }
+        }, 400)
+        return () => {
+            cancelled = true
+            window.clearTimeout(handle)
+        }
+    }, [open, phone, autoFilledForPhone, supabase])
 
     // Auto-fill the cash/UPI/card row's amount to the bill total MINUS
     // whatever the gift card already covers. Re-runs when the gift card
@@ -371,13 +459,44 @@ export function CheckoutPreviewDialog({
                                 onChange={(e) => setName(e.target.value)}
                                 autoComplete="name"
                             />
-                            <Input
-                                placeholder="Mobile number"
-                                value={phone}
-                                onChange={(e) => setPhone(e.target.value)}
-                                autoComplete="tel"
-                                inputMode="tel"
-                            />
+                            {/* Mobile number → auto-lookup. While we're
+                              * looking up, a spinner sits inside the
+                              * field; when we find a row, the helper
+                              * line below flips to "Found: <name>"
+                              * with a green tick. Edit the phone after
+                              * an auto-fill and the lookup effect
+                              * wipes name + email so a previous
+                              * customer can't ride along. */}
+                            <div className="relative">
+                                <Input
+                                    placeholder="Mobile number"
+                                    value={phone}
+                                    onChange={(e) => setPhone(e.target.value)}
+                                    autoComplete="tel"
+                                    inputMode="tel"
+                                    className={cn(
+                                        (lookupBusy || (autoFilledForPhone && lookupName)) && "pr-9",
+                                    )}
+                                />
+                                {lookupBusy && (
+                                    <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" aria-hidden />
+                                )}
+                                {!lookupBusy && autoFilledForPhone && lookupName && (
+                                    <CheckCircle2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-success" aria-hidden />
+                                )}
+                            </div>
+                            {/* Status line — keeps height stable so the
+                              * form doesn't jump as the lookup resolves. */}
+                            <p className={cn(
+                                "text-[11px] leading-tight min-h-[14px]",
+                                autoFilledForPhone && lookupName ? "text-success" : "text-muted-foreground",
+                            )}>
+                                {lookupBusy
+                                    ? "Looking up…"
+                                    : autoFilledForPhone && lookupName
+                                        ? `Found: ${lookupName} — name and email filled in. Edit the phone to clear.`
+                                        : ""}
+                            </p>
                             <Input
                                 placeholder="Email (optional)"
                                 value={email}
@@ -637,6 +756,23 @@ export function CheckoutPreviewDialog({
                                             {row.method === "UPI" && (
                                                 qrPayload ? (
                                                     <div className="rounded-lg border border-primary/30 bg-primary/[0.05] p-3 space-y-2.5">
+                                                        {/* Mode badge — instantly tells the
+                                                          * cashier whether they'll be doing
+                                                          * anything (manual UTR paste) or
+                                                          * nothing (webhook auto-confirms). */}
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <Badge
+                                                                variant={scanToPay ? "success" : "warning"}
+                                                                className="text-[10px] uppercase tracking-wider"
+                                                            >
+                                                                {scanToPay ? "Auto-confirm" : "Manual UPI"}
+                                                            </Badge>
+                                                            <span className="text-[10px] text-muted-foreground">
+                                                                {scanToPay
+                                                                    ? "Paytm webhook fires when payment lands"
+                                                                    : "Cashier pastes the UTR after the customer pays"}
+                                                            </span>
+                                                        </div>
                                                         <div className="flex items-start gap-2">
                                                             <Smartphone className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                                                             <p className="text-xs leading-snug">
@@ -648,6 +784,38 @@ export function CheckoutPreviewDialog({
                                                                 </span>
                                                             </p>
                                                         </div>
+                                                        {/* "Why are we on Manual UPI?" —
+                                                          * only when Paytm was actually
+                                                          * attempted and failed. Null
+                                                          * paytmFallbackReason means
+                                                          * Paytm wasn't configured or it
+                                                          * worked, so we stay quiet. */}
+                                                        {!scanToPay && paytmFallbackReason && (() => {
+                                                            // Defensive sanitiser. paytmPost now
+                                                            // produces a human-readable `message`,
+                                                            // but a future caller could still leak
+                                                            // a JSON body — strip the obvious JSON
+                                                            // chars and cap the length so this
+                                                            // panel can never blow up the cashier
+                                                            // card the way it did before.
+                                                            const cleaned = paytmFallbackReason
+                                                                .replace(/[{}[\]"\\]/g, "")
+                                                                .replace(/\s+/g, " ")
+                                                                .trim()
+                                                            const short = cleaned.length > 80
+                                                                ? `${cleaned.slice(0, 80)}…`
+                                                                : cleaned
+                                                            return (
+                                                                <div className="rounded-md border border-warning/40 bg-warning/[0.06] px-3 py-2 text-[11px] flex items-start gap-2 leading-snug">
+                                                                    <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" />
+                                                                    <span>
+                                                                        <strong className="text-foreground">Paytm couldn&apos;t issue an auto-QR right now</strong>
+                                                                        {short ? <> ({short})</> : null}.
+                                                                        {" "}Falling back to your manual UPI ID — the payment will go through, but the cashier needs to paste the UTR below to confirm it.
+                                                                    </span>
+                                                                </div>
+                                                            )
+                                                        })()}
                                                         <ScanQrImage
                                                             value={qrPayload}
                                                             amount={Number(row.amount) || grandTotal}

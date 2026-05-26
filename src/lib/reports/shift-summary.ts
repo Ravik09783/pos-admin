@@ -68,7 +68,7 @@ export interface CollectionSummary {
     paymentCount: number
 }
 
-const METHOD_LABEL: Record<PaymentMethod, string> = {
+export const METHOD_LABEL: Record<PaymentMethod, string> = {
     CASH: "Cash",
     UPI: "UPI",
     CARD: "Card",

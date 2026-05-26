@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { appOrigin } from "@/lib/app-origin"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { assertSameOrigin } from "@/lib/csrf"
 import { requireSuperAdmin } from "@/lib/super-admin/guard"
@@ -113,7 +114,7 @@ export async function POST(req: Request) {
     }
 
     // ── Mint the magic link ────────────────────────────────────────────
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin
+    const appUrl = appOrigin(req)
     const { data, error } = await service.auth.admin.generateLink({
         type: "magiclink",
         email: targetEmail,

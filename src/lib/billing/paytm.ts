@@ -126,6 +126,49 @@ export function paytmEnvCreds(): PaytmCreds | null {
     }
 }
 
+/**
+ * The shape of `tenant_payment_gateways` columns we need to pick the
+ * correct Paytm credentials. Migration 54 split the legacy single
+ * pair into two: one for Production, one for Test (staging). The
+ * `paytm_env` column picks which set is "active" at runtime — and
+ * `paytm_enabled` is the master kill-switch.
+ *
+ * Callers should pass whatever they get from PostgREST verbatim;
+ * `null`-ish values are handled.
+ */
+export interface TenantPaytmRow {
+    paytm_enabled: boolean | null
+    paytm_env: string | null
+    /** Production pair. */
+    paytm_mid: string | null
+    paytm_merchant_key: string | null
+    /** Staging (Test) pair. New in migration 54. */
+    paytm_mid_staging: string | null
+    paytm_merchant_key_staging: string | null
+}
+
+/**
+ * Resolve which Paytm credentials to use for THIS tenant right now.
+ *
+ *   • Returns null when the gateway is disabled, or when the active
+ *     env's pair isn't populated. Callers should fall back to the
+ *     platform `paytmEnvCreds()` (env-var) in that case.
+ *   • The `env` field on the returned `PaytmCreds` MUST match
+ *     `paytm_env` — Paytm rejects calls if the host doesn't match
+ *     the key set, and that's the source of the "501 System Error"
+ *     class of bugs.
+ *
+ * One place to change if the schema ever evolves again.
+ */
+export function resolveTenantPaytmCreds(row: TenantPaytmRow | null | undefined): PaytmCreds | null {
+    if (!row || !row.paytm_enabled) return null
+    const env: PaytmEnv = row.paytm_env === "production" ? "production" : "staging"
+    const mid = env === "staging" ? row.paytm_mid_staging : row.paytm_mid
+    const key = env === "staging" ? row.paytm_merchant_key_staging : row.paytm_merchant_key
+    if (!mid || !key) return null
+    return { env, mid, merchantKey: key }
+}
+
 interface PaytmResult<T> {
     ok: boolean
     status: number
@@ -155,11 +198,22 @@ async function paytmPost<T>(
         try { parsed = JSON.parse(rawText) } catch { parsed = null }
         const resultInfo = (parsed as { body?: { resultInfo?: { resultMsg?: string; resultStatus?: string } } } | null)
             ?.body?.resultInfo
+        // Build a SHORT, human-readable message — never the raw JSON.
+        // Earlier we fell back to `rawText.slice(0, 200)`, which leaked
+        // verbatim Paytm JSON into the cashier UI when Paytm returned
+        // a 400 with empty resultMsg/resultStatus. Now we synthesise a
+        // short summary; callers that need the full body can read
+        // `rawText` directly (which we still expose).
+        const trimmedMsg = resultInfo?.resultMsg?.trim() ?? ""
+        const trimmedStatus = resultInfo?.resultStatus?.trim() ?? ""
+        const message = trimmedMsg
+            || (trimmedStatus ? `Paytm status ${trimmedStatus} (no message)` : "")
+            || (r.ok ? "Paytm returned an empty response" : `Paytm returned HTTP ${r.status}`)
         return {
             ok: r.ok,
             status: r.status,
             data: (parsed as { body?: T } | null)?.body ?? null,
-            message: resultInfo?.resultMsg ?? resultInfo?.resultStatus ?? rawText.slice(0, 200),
+            message,
             rawText,
         }
     } catch (err) {
