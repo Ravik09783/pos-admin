@@ -1,27 +1,20 @@
 import type { Metadata } from "next"
-import { redirect } from "next/navigation"
 
-import { getCurrentUserAndTenant } from "@/lib/auth/current-user"
 import { LandingPage } from "./_landing/landing"
 import {
     SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION,
     SITE_KEYWORDS, SITE_FEATURES, SITE_FAQ,
 } from "@/lib/site"
 
-// `proxy.ts` is the PRIMARY guard for "logged-in user lands on / →
-// bounce to /menu" — it runs on every request and is supposed to
-// catch this before the page renders. But middleware can quietly
-// fail-open (missing env, Supabase auth blip, edge-runtime cache
-// quirk) and a signed-in user would then see the public landing
-// page, which is confusing and exposes marketing copy + sign-up CTAs
-// to an already-authed user. Adding a server-side `getUser()` here
-// is the belt-and-suspenders: it costs one extra auth round-trip on
-// the public `/` for guests (a few ms) and returns a redirect for
-// authed users, with no chance of cache leakage. The page is still
-// fully prerenderable for unauthenticated crawlers (Google, etc.) —
-// they get the JSON-LD + the landing page just like before.
+// `/` is the marketing landing page and is intentionally accessible
+// to BOTH guests and signed-in users — a logged-in user clicking
+// the logo or typing the bare domain should be able to reach the
+// landing page (handy for sharing a link with a colleague, copying
+// marketing copy, or just navigating "home"). The signed-in user
+// can still jump back into the app via the topbar's Menu launcher
+// or the in-page nav.
 //
-// This `/` route is the ONLY public, indexable page (see robots.ts). All
+// This route is the ONLY public, indexable page (see robots.ts). All
 // the SEO weight — title, description, keywords, OpenGraph, Twitter card,
 // canonical URL and JSON-LD structured data — is concentrated here.
 
@@ -129,12 +122,7 @@ const jsonLd = {
     ],
 }
 
-export default async function Home() {
-    // Defense-in-depth: if the proxy didn't catch this (fail-open path),
-    // server-side redirect authed users to the launcher.
-    const { user } = await getCurrentUserAndTenant()
-    if (user) redirect("/menu")
-
+export default function Home() {
     return (
         <>
             <script

@@ -105,8 +105,17 @@ export function AppShell(props: AppShellProps) {
     // The sidebar is gone — navigation now lives in the topbar's "Menu"
     // launcher (a full-screen card grid). The shell is just topbar +
     // banners + the page itself, full-width.
+    //
+    // `h-dvh` (dynamic viewport height) locks the outer container to
+    // the viewport so the topbar + banners stay pinned at the top
+    // and the page content scrolls inside `<main>` instead. Without
+    // this lock (e.g. with `min-h-screen`), the document grows past
+    // the viewport, the browser scrollbar attaches to `window`, and
+    // the topbar scrolls away with the page. `dvh` rather than `vh`
+    // also handles iOS Safari's URL-bar show/hide correctly so the
+    // bottom of `<main>` doesn't get clipped on mobile.
     return (
-        <div className="min-h-screen flex flex-col">
+        <div className="h-dvh flex flex-col">
             <Topbar
                 tenantId={props.tenantId}
                 tenantName={props.tenantName}
@@ -124,7 +133,7 @@ export function AppShell(props: AppShellProps) {
             {/* Plan-overage banner — fires when the tenant has more
               * branches or staff than their tier covers. OWNER-only. */}
             <PlanOverageBanner role={props.role} />
-            <main className="flex-1 overflow-auto scrollbar-thin">{props.children}</main>
+            <main className="flex-1 min-h-0 overflow-auto scrollbar-thin">{props.children}</main>
         </div>
     )
 }

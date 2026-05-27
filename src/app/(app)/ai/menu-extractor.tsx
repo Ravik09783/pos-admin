@@ -20,10 +20,12 @@ import { useRouter } from "next/navigation"
 import {
     AlertCircle,
     CheckCircle2,
+    ChevronRight,
     ImageIcon,
     Loader2,
     Plus,
     Save,
+    SkipForward,
     Trash2,
     Upload,
     Wand2,
@@ -34,12 +36,19 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ImageUploader } from "@/components/ui/image-uploader"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import { PageHeader } from "@/components/app-shell/page-header"
 import { createClient } from "@/lib/supabase/client"
+import { tenantImagePath } from "@/lib/storage/image-upload"
+import { getTaxConfig, mergedTaxRates, type CountryTaxConfig } from "@/lib/tax/locale-config"
 import { cn } from "@/lib/utils"
+import type { HsnCode } from "@/types/database"
 
 import { preprocessForOcr } from "./image-preprocess"
 import { analyzeAndReflow, type OcrWord } from "./layout-analysis"
@@ -70,6 +79,39 @@ interface EditableSection {
     rowId: string
     name: string
     items: EditableItem[]
+}
+
+/** Snapshot row in the Review-and-Save queue. Captured once when
+ *  the OWNER clicks "Review & Save" so the index stays stable as
+ *  saved items get pruned out of `sections`. */
+interface ReviewQueueEntry {
+    sectionId: string
+    sectionName: string
+    itemId: string
+    base: EditableItem
+}
+
+/** Form state inside the per-item Review dialog. Mirrors the
+ *  field set of the menu-admin "New menu item" dialog so the
+ *  OWNER gets a familiar shape during bulk review. Recommendations
+ *  and branch scope stay out — recommendations need other items
+ *  to already exist, and branch scope can be set later in /menu-admin. */
+interface ReviewForm {
+    sectionId: string
+    itemId: string
+    name: string
+    description: string
+    category_name: string
+    image_url: string | null
+    base_price: string
+    sale_price: string
+    food_type: FoodType
+    gst_slab: string
+    hsn_code: string
+    is_tax_inclusive: boolean
+    is_active: boolean
+    is_sold_out: boolean
+    prep_time_minutes: string
 }
 
 const FOOD_TYPES: { value: FoodType; label: string; dot: string }[] = [
@@ -133,10 +175,10 @@ export function MenuExtractorClient({
      *    needs GEMINI_API_KEY on the server.
      *  - `"local"`: Tesseract.js OCR in the browser. No key, no
      *    network, ~70-80 % accuracy on clean printed menus.
-     *  Defaults to Enhanced when the server has a key configured. */
-    const [mode, setMode] = useState<"local" | "enhanced">(
-        geminiAvailable ? "enhanced" : "local",
-    )
+     *  Always defaults to Local — it's offline, has no quota, and the
+     *  OWNER can opt into Enhanced explicitly when they want the
+     *  higher-accuracy Gemini pass. */
+    const [mode, setMode] = useState<"local" | "enhanced">("local")
     /** Column-handling strategy for Local mode only.
      *  - `"auto"` (default): single OCR pass on the whole image, then
      *    word-level layout analysis detects columns from bbox gaps.
@@ -150,26 +192,83 @@ export function MenuExtractorClient({
      *  + re-parse without re-running OCR. Empty until first extract. */
     const [rawText, setRawText] = useState<string>("")
     const [showRawText, setShowRawText] = useState(false)
+    /** First-time users see the "ideal menu format" sample expanded so
+     *  they understand what gets the highest accuracy. They can collapse
+     *  it once they've internalised the format. */
+    const [showSampleFormat, setShowSampleFormat] = useState(true)
     /** Default tax slab pulled from the tenant's settings on mount — used
      *  as the per-row starting value. Owner can change row-by-row. */
     const [defaultGstSlab, setDefaultGstSlab] = useState<string>("5")
     const [defaultHsn] = useState<string>("996331")
+    /** Look-ups the polished review dialog needs to mirror the
+     *  menu-admin "New menu item" form: HSN/SAC list, the tenant's
+     *  custom tax rates (Settings → Tax), inclusive-pricing default,
+     *  and the existing category list so the OWNER can drop an
+     *  extracted item into a category that already exists. */
+    const [hsnCodes, setHsnCodes] = useState<HsnCode[]>([])
+    const [tenantCustomRates, setTenantCustomRates] = useState<number[]>([])
+    const [tenantPricesIncludeTax, setTenantPricesIncludeTax] = useState(false)
+    const [existingCategories, setExistingCategories] = useState<{ id: string; name: string }[]>([])
+    const taxCfg: CountryTaxConfig = useMemo(() => getTaxConfig(tenantCountry), [tenantCountry])
 
-    // Pull the tenant's default tax slab once — applied to every
-    // extracted row so the OWNER doesn't have to set it on each line.
+    // ── Review-and-save flow ──────────────────────────────────────
+    // The "Review & Save" button walks the OWNER through each
+    // extracted item one at a time, opening a pre-filled form they
+    // can tweak before committing. Behaves like the menu-admin
+    // "New item" dialog, but driven by a stable snapshot queue so the
+    // index stays valid even as saved items get pruned from sections.
+    const [reviewOpen, setReviewOpen] = useState(false)
+    const [reviewQueue, setReviewQueue] = useState<ReviewQueueEntry[]>([])
+    const [reviewIndex, setReviewIndex] = useState(0)
+    const [reviewForm, setReviewForm] = useState<ReviewForm | null>(null)
+    const [savingOne, setSavingOne] = useState(false)
+    // Tenant-category lookup cache, populated lazily so we don't
+    // re-fetch + re-insert the same category between items.
+    const categoryCacheRef = useRef<Map<string, string>>(new Map())
+
+    // Pull the tenant's default tax slab + custom rates + inclusive
+    // flag once, alongside the HSN list and existing category list.
+    // All four feed the polished Review dialog so the OWNER sees the
+    // same dropdowns they get on the menu-admin "New menu item" form.
     useEffect(() => {
         let alive = true
         ;(async () => {
-            const { data } = await supabase
-                .from("tenants")
-                .select("default_gst_rate")
-                .eq("id", tenantId)
-                .maybeSingle() as { data: { default_gst_rate: number | null } | null }
+            const [{ data: tenant }, { data: hsn }, { data: cats }] = await Promise.all([
+                supabase
+                    .from("tenants")
+                    .select("default_gst_rate, default_tax_rate, custom_tax_rates, prices_include_tax")
+                    .eq("id", tenantId)
+                    .maybeSingle(),
+                supabase
+                    .from("hsn_codes")
+                    .select("*")
+                    .order("code"),
+                supabase
+                    .from("menu_categories")
+                    .select("id, name")
+                    .eq("tenant_id", tenantId)
+                    .is("deleted_at", null)
+                    .order("sort_order"),
+            ])
             if (!alive) return
-            const slab = data?.default_gst_rate
-            if (slab != null && GST_SLABS.includes(String(slab))) {
-                setDefaultGstSlab(String(slab))
-            }
+            const tx = tenant as {
+                default_gst_rate?: number | null
+                default_tax_rate?: number | null
+                custom_tax_rates?: number[] | null
+                prices_include_tax?: boolean | null
+            } | null
+            const slab = tx?.default_tax_rate ?? tx?.default_gst_rate ?? null
+            if (slab != null) setDefaultGstSlab(String(slab))
+            setTenantCustomRates(tx?.custom_tax_rates ?? [])
+            setTenantPricesIncludeTax(tx?.prices_include_tax ?? false)
+            setHsnCodes((hsn ?? []) as HsnCode[])
+            const existing = (cats ?? []) as { id: string; name: string }[]
+            setExistingCategories(existing)
+            // Pre-warm the category cache with what's already in the
+            // DB so saveOne() doesn't refetch per item.
+            const cache = new Map<string, string>()
+            for (const c of existing) cache.set(c.name.trim().toLowerCase(), c.id)
+            categoryCacheRef.current = cache
         })()
         return () => { alive = false }
     }, [supabase, tenantId])
@@ -225,6 +324,13 @@ export function MenuExtractorClient({
         //    bypassed — we POST the raw image to /api/ai/extract-menu,
         //    Gemini returns structured sections directly.
         if (mode === "enhanced") {
+            // Client-side abort at 65 s — slightly longer than the
+            // route's maxDuration=60 + the gemini-menu helper's 55 s
+            // AbortController so the server-side error reaches us
+            // before the browser gives up. Without this, a hung
+            // request leaves the user staring at the spinner forever.
+            const clientAc = new AbortController()
+            const clientTimer = setTimeout(() => clientAc.abort(), 65_000)
             try {
                 const fd = new FormData()
                 fd.append("image", image.file)
@@ -232,7 +338,11 @@ export function MenuExtractorClient({
                 // don't have a real percentage. Bump it visibly so the
                 // bar doesn't look frozen.
                 setProgress(15)
-                const r = await fetch("/api/ai/extract-menu", { method: "POST", body: fd })
+                const r = await fetch("/api/ai/extract-menu", {
+                    method: "POST",
+                    body: fd,
+                    signal: clientAc.signal,
+                })
                 setProgress(80)
                 const data = await r.json().catch(() => null) as
                     | { ok: true; sections: Array<{ category: string; items: Array<{ name: string; description?: string | null; price: number; food_type?: FoodType }> }> }
@@ -272,8 +382,14 @@ export function MenuExtractorClient({
                 const total = parsed.reduce((s, c) => s + c.items.length, 0)
                 toast.success(`Extracted ${total} item${total === 1 ? "" : "s"} across ${parsed.length} categor${parsed.length === 1 ? "y" : "ies"}.`)
             } catch (e) {
-                toast.error(e instanceof Error ? e.message : "Couldn't reach the extraction service.")
+                if (e instanceof Error && e.name === "AbortError") {
+                    toast.error("Enhanced extraction timed out (>65 s). Try a smaller / clearer image, or switch to Local mode.")
+                } else {
+                    toast.error(e instanceof Error ? e.message : "Couldn't reach the extraction service.")
+                }
                 setStage("idle")
+            } finally {
+                clearTimeout(clientTimer)
             }
             return
         }
@@ -452,6 +568,200 @@ export function MenuExtractorClient({
                 ? { ...s, items: s.items.filter((it) => it.rowId !== itemId) }
                 : s,
         ))
+    }
+
+    /** Returns the id of a category with this (case-insensitive) name,
+     *  creating it on the fly if no match exists. Uses an in-memory
+     *  cache so the per-item Review flow doesn't refetch + reinsert
+     *  the same category across consecutive saves.
+     *
+     *  IMPORTANT: as well as updating the ref-cache, every successful
+     *  resolution also nudges `existingCategories` state so the
+     *  Category Select dropdown re-renders with the newly-known
+     *  option. Without this, the second item from a freshly-created
+     *  section would seed its form with the new UUID but the
+     *  dropdown wouldn't have the matching `<SelectItem>` — the
+     *  trigger would render empty and the OWNER couldn't even
+     *  re-pick the category they just made. */
+    async function resolveCategoryId(rawName: string): Promise<string> {
+        const name = rawName.trim()
+        const lookup = name.toLowerCase()
+        const cached = categoryCacheRef.current.get(lookup)
+        if (cached) return cached
+        const { data: existing } = await supabase
+            .from("menu_categories")
+            .select("id, name")
+            .eq("tenant_id", tenantId)
+            .ilike("name", name)
+            .is("deleted_at", null)
+            .maybeSingle() as { data: { id: string; name: string } | null }
+        if (existing) {
+            categoryCacheRef.current.set(lookup, existing.id)
+            setExistingCategories((prev) =>
+                prev.some((c) => c.id === existing.id) ? prev : [...prev, { id: existing.id, name: existing.name }],
+            )
+            return existing.id
+        }
+        const { data: created, error: catErr } = await supabase
+            .from("menu_categories")
+            .insert({ tenant_id: tenantId, name } as never)
+            .select("id")
+            .single()
+        if (catErr || !created) {
+            throw new Error(`Couldn't create category "${name}": ${catErr?.message ?? "unknown"}`)
+        }
+        const id = (created as { id: string }).id
+        categoryCacheRef.current.set(lookup, id)
+        setExistingCategories((prev) =>
+            prev.some((c) => c.id === id) ? prev : [...prev, { id, name }],
+        )
+        return id
+    }
+
+    // ── Review & Save: open a pre-filled form per item, one at a time,
+    //    so the OWNER can sanity-check + tweak before the row hits
+    //    the DB. Items that get saved are pruned from `sections` so
+    //    the bottom-bar counter + table reflect what's actually left.
+    function seedReviewFormFrom(queue: ReviewQueueEntry[], idx: number) {
+        const entry = queue[idx]
+        if (!entry) {
+            setReviewForm(null)
+            return
+        }
+        // Resolve the category name to an existing id when we have a
+        // match, otherwise pass the literal extracted name through —
+        // the dialog's Category select treats `__new:<name>` as a
+        // create-on-save sentinel.
+        const lookup = entry.sectionName.trim().toLowerCase()
+        const existingId = categoryCacheRef.current.get(lookup) ?? null
+        setReviewForm({
+            sectionId: entry.sectionId,
+            itemId: entry.itemId,
+            name: entry.base.name,
+            description: entry.base.description,
+            category_name: existingId ?? `__new:${entry.sectionName.trim()}`,
+            image_url: null,
+            base_price: entry.base.price,
+            sale_price: entry.base.sale_price,
+            food_type: entry.base.food_type,
+            gst_slab: entry.base.gst_slab,
+            hsn_code: entry.base.hsn_code || defaultHsn,
+            is_tax_inclusive: tenantPricesIncludeTax,
+            is_active: true,
+            is_sold_out: entry.base.is_sold_out,
+            prep_time_minutes: "10",
+        })
+    }
+
+    function startReview() {
+        const queue: ReviewQueueEntry[] = []
+        for (const sec of sections) {
+            for (const it of sec.items) {
+                queue.push({ sectionId: sec.rowId, sectionName: sec.name, itemId: it.rowId, base: it })
+            }
+        }
+        if (queue.length === 0) {
+            toast.error("Nothing to review — add at least one item.")
+            return
+        }
+        // Note: don't wipe categoryCacheRef here — it's been pre-warmed
+        // with the tenant's existing categories so the Select can show
+        // an extracted category as already-matched on first open.
+        setReviewQueue(queue)
+        setReviewIndex(0)
+        seedReviewFormFrom(queue, 0)
+        setReviewOpen(true)
+    }
+
+    function advanceReview() {
+        const next = reviewIndex + 1
+        if (next >= reviewQueue.length) {
+            setReviewOpen(false)
+            setReviewForm(null)
+            toast.success("All items reviewed — heading to your menu.")
+            router.push("/menu-admin")
+            router.refresh()
+            return
+        }
+        setReviewIndex(next)
+        seedReviewFormFrom(reviewQueue, next)
+    }
+
+    function skipReview() {
+        advanceReview()
+    }
+
+    async function saveOne() {
+        if (!reviewForm) return
+        if (!reviewForm.name.trim()) {
+            toast.error("Name required.")
+            return
+        }
+        if (!reviewForm.category_name.trim()) {
+            toast.error("Category required.")
+            return
+        }
+        const basePrice = Number.parseFloat(reviewForm.base_price)
+        if (!Number.isFinite(basePrice) || basePrice <= 0) {
+            toast.error("Enter a valid price.")
+            return
+        }
+        let salePrice: number | null = null
+        if (reviewForm.sale_price.trim() !== "") {
+            const sp = Number.parseFloat(reviewForm.sale_price)
+            if (!Number.isFinite(sp) || sp <= 0 || sp >= basePrice) {
+                toast.error("Sale price must be lower than the regular price.")
+                return
+            }
+            salePrice = Number(sp.toFixed(2))
+        }
+        setSavingOne(true)
+        try {
+            // The Category select stores either a real category id
+            // (existing tenant category) or `__new:<name>` for the
+            // extracted-but-not-yet-created case. Both paths converge
+            // on resolveCategoryId which does match-or-create.
+            const rawCategory = reviewForm.category_name
+            let categoryId: string
+            if (rawCategory.startsWith("__new:")) {
+                categoryId = await resolveCategoryId(rawCategory.slice("__new:".length))
+            } else if (existingCategories.some((c) => c.id === rawCategory)) {
+                categoryId = rawCategory
+            } else {
+                categoryId = await resolveCategoryId(rawCategory)
+            }
+            const payload = {
+                tenant_id: tenantId,
+                category_id: categoryId,
+                name: reviewForm.name.trim(),
+                description: reviewForm.description.trim() || null,
+                base_price: basePrice,
+                sale_price: salePrice,
+                food_type: reviewForm.food_type,
+                hsn_code: reviewForm.hsn_code.trim() || null,
+                gst_slab: Number(reviewForm.gst_slab) || 0,
+                is_tax_inclusive: reviewForm.is_tax_inclusive,
+                is_active: reviewForm.is_active,
+                is_sold_out: reviewForm.is_sold_out,
+                prep_time_minutes: Number(reviewForm.prep_time_minutes) || 10,
+                image_url: reviewForm.image_url,
+            }
+            const { error: itemErr } = await supabase.from("menu_items").insert(payload as never)
+            if (itemErr) throw new Error(itemErr.message)
+            // Prune the saved row from `sections` so the counter and
+            // table stay truthful about what's still pending.
+            setSections((prev) => prev.map((s) =>
+                s.rowId === reviewForm.sectionId
+                    ? { ...s, items: s.items.filter((it) => it.rowId !== reviewForm.itemId) }
+                    : s,
+            ))
+            toast.success(`Saved "${reviewForm.name.trim()}"`)
+            advanceReview()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Save failed")
+        } finally {
+            setSavingOne(false)
+        }
     }
 
     // ── Save: APPEND mode (per the brief). For each section we either
@@ -639,6 +949,65 @@ export function MenuExtractorClient({
                             </p>
                         )}
                     </div>
+
+                    {/* ── Sample format guide ──────────────────────────
+                      * Shows new owners what an "ideal" menu image
+                      * looks like (clear category headers + one item
+                      * per line + price at the end) and reassures
+                      * them that messier menus still work — they'll
+                      * just need a quick review pass before saving. */}
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                                    Sample
+                                </Badge>
+                                <h3 className="text-sm font-semibold">
+                                    Best results from menus that look like this
+                                </h3>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowSampleFormat((s) => !s)}
+                            >
+                                {showSampleFormat ? "Hide sample" : "Show sample"}
+                            </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-snug">
+                            Don&apos;t worry — we can still pull items from differently-formatted menus, fancy banners, or photos taken at an angle. Those just need a quick review and a few corrections before saving.
+                        </p>
+                        {showSampleFormat && (
+                            <div className="grid md:grid-cols-[1fr_auto] gap-3 pt-1">
+                                <pre className="rounded-md border border-border/60 bg-background p-3 font-mono text-[11px] leading-relaxed whitespace-pre overflow-x-auto">{`────────────────────────────
+        STARTERS
+────────────────────────────
+Paneer Tikka              250
+   Grilled cottage cheese
+   in tandoori spices
+
+Veg Spring Rolls          180
+Chicken 65                220
+
+────────────────────────────
+        MAINS
+────────────────────────────
+Butter Chicken            380
+Dal Makhani               220
+Paneer Butter Masala      260
+Veg Biryani               240`}</pre>
+                                <ul className="text-[11px] text-muted-foreground space-y-1.5 leading-snug max-w-[260px]">
+                                    <li className="flex gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" /><span>One clear <strong>category heading</strong> per section (e.g. <em>Starters</em>, <em>Mains</em>).</span></li>
+                                    <li className="flex gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" /><span>One item per line — <strong>name on the left, price at the end</strong>.</span></li>
+                                    <li className="flex gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" /><span>Description indented or wrapped under the item name (optional).</span></li>
+                                    <li className="flex gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" /><span>Plain dark text on a light background, photo taken straight-on.</span></li>
+                                    <li className="flex gap-1.5"><AlertCircle className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" /><span>Stylised fonts, watermarks behind text, or steep angles still work — just expect to fix a few rows.</span></li>
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+
                     {!image ? (
                         <div
                             onDrop={onDrop}
@@ -853,28 +1222,66 @@ export function MenuExtractorClient({
             {/* ── Sticky save bar ──────────────────────────────────────── */}
             {/* Visible during BOTH review AND saving so the spinner can
               * land on the button instead of the bar disappearing
-              * mid-save and confusing the owner. */}
+              * mid-save and confusing the owner. Two actions:
+              *   - Save all      → bulk-insert every item as-is.
+              *   - Review & Save → walk through each item in a pre-filled
+              *                     dialog so the OWNER can tweak first. */}
             {(stage === "review" || stage === "saving") && (
                 <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/85 backdrop-blur-xl">
-                    <div className="container mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="container mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
                         <div className="text-xs text-muted-foreground">
                             {totalItems > 0
                                 ? <>Ready to add <strong className="text-foreground">{totalItems}</strong> item{totalItems === 1 ? "" : "s"} to your menu.</>
                                 : "Add at least one item to save."}
                         </div>
-                        <Button
-                            variant="neon"
-                            onClick={save}
-                            disabled={stage === "saving" || totalItems === 0}
-                        >
-                            {stage === "saving"
-                                ? <Loader2 className="h-4 w-4 animate-spin" />
-                                : <Save className="h-4 w-4" />}
-                            Save all items
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={startReview}
+                                disabled={stage === "saving" || totalItems === 0}
+                                title="Open each item in a pre-filled form to review before saving"
+                            >
+                                <Wand2 className="h-4 w-4" />
+                                Review &amp; Save
+                            </Button>
+                            <Button
+                                variant="neon"
+                                onClick={save}
+                                disabled={stage === "saving" || totalItems === 0}
+                                title="Save every item as-is without reviewing"
+                            >
+                                {stage === "saving"
+                                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                                    : <Save className="h-4 w-4" />}
+                                Save all
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
+
+            {/* ── Review & Save dialog ─────────────────────────────────── */}
+            <ReviewDialog
+                open={reviewOpen}
+                form={reviewForm}
+                index={reviewIndex}
+                total={reviewQueue.length}
+                saving={savingOne}
+                tenantId={tenantId}
+                tenantCountry={tenantCountry}
+                taxCfg={taxCfg}
+                tenantCustomRates={tenantCustomRates}
+                hsnCodes={hsnCodes}
+                existingCategories={existingCategories}
+                onClose={() => {
+                    if (savingOne) return
+                    setReviewOpen(false)
+                    setReviewForm(null)
+                }}
+                onChange={(patch) => setReviewForm((prev) => prev ? { ...prev, ...patch } : prev)}
+                onSkip={skipReview}
+                onSave={saveOne}
+            />
         </div>
     )
 }
@@ -900,20 +1307,50 @@ function SectionBlock({
     onUpdateItem: (itemId: string, patch: Partial<EditableItem>) => void
     onRemoveItem: (itemId: string) => void
 }) {
+    // Reactive food-type strip — recomputed each render from the
+    // current items, so the moment the OWNER flips an item's
+    // food_type (or removes the last veg row) the corresponding
+    // dot appears or disappears from the header.
+    const presentFoodTypes = FOOD_TYPES.filter((f) =>
+        section.items.some((it) => it.food_type === f.value),
+    )
     return (
-        <div className="rounded-xl border border-border/60 overflow-hidden">
-            <div className="flex items-center justify-between gap-2 p-3 bg-muted/30 border-b border-border/40 flex-wrap">
-                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Category</Label>
+        <div className="rounded-xl border border-border/60 overflow-hidden shadow-sm">
+            {/* Header bar — stronger contrast + bigger title field so
+              * category boundaries are unmistakable in a long list of
+              * sections. A primary-tinted left edge gives each card a
+              * clear vertical anchor. */}
+            <div className="relative flex items-center justify-between gap-3 p-4 bg-gradient-to-r from-primary/[0.06] via-muted/40 to-transparent border-b border-border/50 flex-wrap">
+                <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-primary to-[hsl(var(--neon-magenta))]" />
+                <div className="flex items-center gap-2 flex-1 min-w-[200px] pl-1">
                     <Input
                         value={section.name}
                         onChange={(e) => onRename(e.target.value)}
-                        className="h-8 max-w-xs font-medium"
-                        placeholder="e.g. Starters"
+                        className="h-10 max-w-sm text-base font-semibold border-transparent bg-background/60 focus-visible:border-border focus-visible:bg-background"
+                        placeholder="Category name"
                     />
-                    <Badge variant="outline" className="text-[10px]">
+                    <Badge variant="outline" className="text-[10px] shrink-0">
                         {section.items.length} item{section.items.length === 1 ? "" : "s"}
                     </Badge>
+                    {/* Food-type presence dots. Hover/title spells out
+                      * which type each dot stands for. Hidden when the
+                      * section is empty — nothing to indicate yet. */}
+                    {presentFoodTypes.length > 0 && (
+                        <div
+                            className="flex items-center gap-1 px-2 py-1 rounded-full bg-background/70 border border-border/60 shrink-0"
+                            title={`Contains: ${presentFoodTypes.map((f) => f.label).join(", ")}`}
+                            aria-label={`Food types in this category: ${presentFoodTypes.map((f) => f.label).join(", ")}`}
+                        >
+                            {presentFoodTypes.map((f) => (
+                                <span
+                                    key={f.value}
+                                    className={cn("h-2.5 w-2.5 rounded-full", f.dot)}
+                                    title={f.label}
+                                    aria-hidden
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
                 <div className="flex items-center gap-1">
                     <Button variant="ghost" size="sm" onClick={onAddItem}>
@@ -967,61 +1404,91 @@ function ItemRow({
     onChange: (patch: Partial<EditableItem>) => void
     onRemove: () => void
 }) {
-    const ftDot = FOOD_TYPES.find((f) => f.value === item.food_type)?.dot ?? "bg-muted"
+    const ft = FOOD_TYPES.find((f) => f.value === item.food_type)
+    const ftDot = ft?.dot ?? "bg-muted"
+    const ftLabel = ft?.label ?? "—"
+    // Borderless-by-default styling shared across the inline-editable
+    // text inputs. The border + background reveal on hover/focus so
+    // the row reads like a polished menu listing at rest, and like a
+    // form only when the OWNER actually clicks in to edit.
+    const inlineInput = "border-transparent bg-transparent transition-colors hover:bg-background hover:border-border focus-visible:bg-background focus-visible:border-border"
     return (
-        <li className="p-3 grid gap-2 lg:grid-cols-[1fr_120px_120px_120px_auto] items-start">
-            {/* Name + description stack on the left so the OWNER can see the
-              * full label even on smaller screens. */}
-            <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                    <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", ftDot)} aria-hidden />
+        <li className={cn(
+            "group relative px-4 py-3 transition-colors",
+            "hover:bg-muted/20",
+            item.is_sold_out && "opacity-70",
+        )}>
+            {/* ── Top row: Name on the left, Price on the right ──
+              * The hero of each card. Big, bold, instantly scannable. */}
+            <div className="flex items-start gap-3">
+                <span
+                    className={cn("h-3 w-3 rounded-full shrink-0 mt-3 ring-2 ring-background shadow-sm", ftDot)}
+                    aria-hidden
+                />
+                <div className="flex-1 min-w-0">
                     <Input
                         value={item.name}
                         onChange={(e) => onChange({ name: e.target.value })}
-                        className="h-8 font-medium"
+                        className={cn("h-9 font-semibold text-base px-2 -mx-2", inlineInput)}
                         placeholder="Dish name"
                     />
+                    <Input
+                        value={item.description}
+                        onChange={(e) => onChange({ description: e.target.value })}
+                        className={cn("h-7 text-xs text-muted-foreground px-2 -mx-2 mt-0.5", inlineInput)}
+                        placeholder="Short description (optional)"
+                    />
                 </div>
-                <Input
-                    value={item.description}
-                    onChange={(e) => onChange({ description: e.target.value })}
-                    className="h-8 text-xs"
-                    placeholder="Description (optional)"
-                />
+                {/* Price block — currency on the left, big mono number
+                  * on the right. Sale-price preview slips in under it
+                  * when set, with a live "% off" callout. */}
+                <div className="shrink-0 text-right">
+                    <div className="inline-flex items-baseline gap-0.5">
+                        <span className="text-xs text-muted-foreground font-medium pb-1">{currency}</span>
+                        <Input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0"
+                            value={item.price}
+                            onChange={(e) => onChange({ price: e.target.value })}
+                            className={cn("h-9 w-24 text-right text-lg font-bold font-mono tabular-nums px-1", inlineInput)}
+                            placeholder="0.00"
+                        />
+                    </div>
+                    {(() => {
+                        const base = Number.parseFloat(item.price)
+                        const sale = Number.parseFloat(item.sale_price)
+                        if (!item.sale_price.trim()) return null
+                        if (!Number.isFinite(base) || base <= 0) return null
+                        if (!Number.isFinite(sale) || sale <= 0 || sale >= base) return null
+                        const pct = Math.round((1 - sale / base) * 100)
+                        return (
+                            <div className="text-[10px] text-success font-semibold mt-0.5">
+                                Sale · {currency} {sale.toFixed(2)} · {pct}% off
+                            </div>
+                        )
+                    })()}
+                    {item.is_sold_out && (
+                        <Badge variant="destructive" className="text-[10px] mt-0.5">Sold out</Badge>
+                    )}
+                </div>
             </div>
 
-            <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Price ({currency})</Label>
-                <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0"
-                    value={item.price}
-                    onChange={(e) => onChange({ price: e.target.value })}
-                    className="h-8 font-mono text-xs"
-                    placeholder="0.00"
-                />
-            </div>
-
-            <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Sale price</Label>
-                <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0"
-                    value={item.sale_price}
-                    onChange={(e) => onChange({ sale_price: e.target.value })}
-                    className="h-8 font-mono text-xs"
-                    placeholder="—"
-                />
-            </div>
-
-            <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Food type</Label>
+            {/* ── Bottom chip strip ──
+              * All the metadata fields, compacted into a pill row so
+              * they read as tags rather than form fields. flex-wrap
+              * + ml-6 lines them up under the name (past the dot
+              * gutter) so it feels like one connected block. */}
+            <div className="flex items-center gap-1.5 flex-wrap mt-2 ml-6">
+                {/* Food type — chip-shaped Select with the colour dot.
+                  * The visible dot here is the live one driving the
+                  * presence-summary up on the category header. */}
                 <Select value={item.food_type} onValueChange={(v) => onChange({ food_type: v as FoodType })}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-7 w-auto text-xs rounded-full bg-card border-border/60 gap-1.5 px-2.5 hover:bg-muted/40 transition-colors">
+                        <span className={cn("h-2 w-2 rounded-full shrink-0", ftDot)} aria-hidden />
+                        <span>{ftLabel}</span>
+                    </SelectTrigger>
                     <SelectContent>
                         {FOOD_TYPES.map((f) => (
                             <SelectItem key={f.value} value={f.value}>
@@ -1033,78 +1500,407 @@ function ItemRow({
                         ))}
                     </SelectContent>
                 </Select>
-            </div>
 
-            <div className="flex items-start gap-1 pt-1">
-                {showTaxColumns ? (
-                    <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">{taxShortName} %</Label>
-                        <Select value={item.gst_slab} onValueChange={(v) => onChange({ gst_slab: v })}>
-                            <SelectTrigger className="h-8 text-xs w-[80px]"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                {GST_SLABS.map((s) => (
-                                    <SelectItem key={s} value={s}>{s}%</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                ) : (
-                    /* Outside India just default to 0% so the field doesn't
-                     * lie about an Indian GST rate on a US menu. */
-                    <input type="hidden" value={item.gst_slab} readOnly />
+                {/* Sale price — labelled chip with an inline input.
+                  * The strikethrough/% preview happens up top under the
+                  * main price; here we just expose the input. */}
+                <div className="inline-flex items-center gap-1.5 h-7 rounded-full bg-card border border-border/60 px-2.5 text-xs hover:bg-muted/40 transition-colors">
+                    <span className="text-muted-foreground font-medium">Sale</span>
+                    <Input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        value={item.sale_price}
+                        onChange={(e) => onChange({ sale_price: e.target.value })}
+                        className="h-5 w-14 border-0 bg-transparent p-0 text-xs font-mono tabular-nums shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        placeholder="—"
+                    />
+                </div>
+
+                {/* Tax slab — India only. Outside India the field still
+                  * exists in state (defaulted to 0) but isn't rendered
+                  * so a US menu doesn't lie about a GST rate. */}
+                {showTaxColumns && (
+                    <Select value={item.gst_slab} onValueChange={(v) => onChange({ gst_slab: v })}>
+                        <SelectTrigger className="h-7 w-auto text-xs rounded-full bg-card border-border/60 gap-1 px-2.5 hover:bg-muted/40 transition-colors">
+                            <span className="text-muted-foreground font-medium">{taxShortName}</span>
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {GST_SLABS.map((s) => (
+                                <SelectItem key={s} value={s}>{s}%</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 )}
+
+                {/* HSN code — India only. Chip with inline mono input. */}
+                {tenantCountry === "IN" && (
+                    <div className="inline-flex items-center gap-1.5 h-7 rounded-full bg-card border border-border/60 px-2.5 text-xs hover:bg-muted/40 transition-colors">
+                        <span className="text-muted-foreground font-medium">HSN</span>
+                        <Input
+                            value={item.hsn_code}
+                            onChange={(e) => onChange({ hsn_code: e.target.value })}
+                            className="h-5 w-20 border-0 bg-transparent p-0 text-xs font-mono tabular-nums shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                            placeholder="996331"
+                        />
+                    </div>
+                )}
+
+                {/* Sold-out toggle — pill with destructive accent when
+                  * on, neutral when off. Makes the active "off-menu"
+                  * state immediately legible without a separate badge. */}
+                <label
+                    className={cn(
+                        "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-xs cursor-pointer transition-colors select-none",
+                        item.is_sold_out
+                            ? "bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/15"
+                            : "bg-card border-border/60 hover:bg-muted/40",
+                    )}
+                >
+                    <input
+                        type="checkbox"
+                        checked={item.is_sold_out}
+                        onChange={(e) => onChange({ is_sold_out: e.target.checked })}
+                        className="h-3 w-3 accent-destructive cursor-pointer"
+                    />
+                    Sold out
+                </label>
+
+                {/* Delete — push to the far right; only visible on
+                  * row hover / focus so the chip strip looks calm at
+                  * rest and pops a clear destructive affordance the
+                  * moment the OWNER mouses in. */}
                 <Button
                     variant="ghost"
-                    size="icon"
-                    className="text-destructive hover:bg-destructive/10 mt-5"
+                    size="sm"
                     onClick={onRemove}
+                    className="ml-auto h-7 px-2 text-destructive opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity hover:bg-destructive/10"
                     title="Remove item"
                 >
                     <Trash2 className="h-3.5 w-3.5" />
                 </Button>
             </div>
-
-            {/* India: HSN field on its own line so the row stays tidy. */}
-            {tenantCountry === "IN" && (
-                <div className="lg:col-span-5 flex items-center gap-2">
-                    <Label className="text-[10px] text-muted-foreground">HSN</Label>
-                    <Input
-                        value={item.hsn_code}
-                        onChange={(e) => onChange({ hsn_code: e.target.value })}
-                        className="h-7 font-mono text-xs w-32"
-                        placeholder="996331"
-                    />
-                    <div className="flex items-center gap-1.5 ml-auto">
-                        <input
-                            id={`sold-${item.rowId}`}
-                            type="checkbox"
-                            checked={item.is_sold_out}
-                            onChange={(e) => onChange({ is_sold_out: e.target.checked })}
-                            className="h-3.5 w-3.5"
-                        />
-                        <Label htmlFor={`sold-${item.rowId}`} className="text-[11px] text-muted-foreground cursor-pointer">
-                            Sold out
-                        </Label>
-                    </div>
-                </div>
-            )}
-            {tenantCountry !== "IN" && (
-                <div className="lg:col-span-5 flex items-center gap-1.5 justify-end">
-                    <input
-                        id={`sold-${item.rowId}`}
-                        type="checkbox"
-                        checked={item.is_sold_out}
-                        onChange={(e) => onChange({ is_sold_out: e.target.checked })}
-                        className="h-3.5 w-3.5"
-                    />
-                    <Label htmlFor={`sold-${item.rowId}`} className="text-[11px] text-muted-foreground cursor-pointer">
-                        Sold out
-                    </Label>
-                </div>
-            )}
         </li>
     )
 }
 
-// Hint icons that aren't otherwise wired in but are good defaults.
-void ImageIcon; void AlertCircle; void CheckCircle2
+// ─────────────────────────────────────────────────────────────────────
+// Section divider with label — same look as the menu-admin dialog so
+// the OWNER feels at home during bulk review.
+// ─────────────────────────────────────────────────────────────────────
+function SectionLabel({ children }: { children: React.ReactNode }) {
+    return (
+        <div className="flex items-center gap-2 mb-3">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 whitespace-nowrap">
+                {children}
+            </span>
+            <div className="flex-1 h-px bg-border/50" />
+        </div>
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Bordered toggle row — used for tax-inclusive / active / sold-out
+// in the dialog. Same component as menu-admin's ToggleRow.
+// ─────────────────────────────────────────────────────────────────────
+function ToggleRow({
+    label, hint, checked, onCheckedChange,
+}: {
+    label: string; hint: string; checked: boolean; onCheckedChange: (v: boolean) => void
+}) {
+    return (
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+            <div className="min-w-0">
+                <p className="text-sm font-medium leading-none">{label}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+            </div>
+            <Switch checked={checked} onCheckedChange={onCheckedChange} />
+        </div>
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Per-item Review dialog. Visually identical to the menu-admin
+// "New menu item" dialog (two-column layout, sectioned, pinned
+// header + footer, scrollable body) so the OWNER sees a familiar
+// shape during bulk review. The recommendations panel is omitted
+// because newly-extracted items don't exist in the DB yet — the
+// OWNER can add upsells back in /menu-admin once everything is in.
+// The dialog itself is stateless — the parent drives `form` + emits
+// patches on change so the index/queue logic stays in one place.
+// ─────────────────────────────────────────────────────────────────────
+function ReviewDialog({
+    open, form, index, total, saving,
+    tenantId, tenantCountry, taxCfg, tenantCustomRates, hsnCodes, existingCategories,
+    onClose, onChange, onSkip, onSave,
+}: {
+    open: boolean
+    form: ReviewForm | null
+    index: number
+    total: number
+    saving: boolean
+    tenantId: string
+    tenantCountry: string | null
+    taxCfg: CountryTaxConfig
+    tenantCustomRates: number[]
+    hsnCodes: HsnCode[]
+    existingCategories: { id: string; name: string }[]
+    onClose: () => void
+    onChange: (patch: Partial<ReviewForm>) => void
+    onSkip: () => void
+    onSave: () => void
+}) {
+    if (!form) return null
+    const basePrice = Number.parseFloat(form.base_price)
+    const salePrice = Number.parseFloat(form.sale_price)
+    const salePriceFeedback = (() => {
+        if (!Number.isFinite(basePrice) || basePrice <= 0) return null
+        if (!form.sale_price.trim()) return null
+        if (!Number.isFinite(salePrice) || salePrice <= 0 || salePrice >= basePrice) {
+            return <p className="mt-1 text-[11px] text-destructive">Must be lower than the regular price</p>
+        }
+        const pct = Math.round((1 - salePrice / basePrice) * 100)
+        return <p className="mt-1 text-[11px] text-success">{pct}% off · saves {taxCfg.currency} {(basePrice - salePrice).toFixed(2)}</p>
+    })()
+
+    // Synthetic "Create new: <name>" entry for an extracted category
+    // that hasn't been saved to the DB yet. Stored as `__new:<name>`
+    // — the parent's saveOne detects the prefix.
+    const newCategorySentinel = form.category_name.startsWith("__new:") ? form.category_name : null
+    const newCategoryLabel = newCategorySentinel?.slice("__new:".length).trim() ?? ""
+
+    return (
+        <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
+            <DialogContent className="flex flex-col w-full max-w-3xl max-h-[95dvh] overflow-hidden p-0 gap-0">
+
+                {/* ── Header ── */}
+                <DialogHeader className="shrink-0 px-6 pt-5 pb-4 border-b border-border/40">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <DialogTitle className="text-lg font-semibold">Review menu item</DialogTitle>
+                        <Badge variant="outline" className="text-[10px]">
+                            Item {index + 1} of {total}
+                        </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                        Tweak the fields below and tap <strong>Save &amp; Next</strong>. Use <strong>Skip</strong> to leave this one for later — skipped items stay in the table.
+                    </p>
+                </DialogHeader>
+
+                {/* ── Scrollable body (vertical only) ── */}
+                <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-5 space-y-6">
+
+                    {/* ══ ROW 1: Two-column grid ══ */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-8">
+
+                        {/* ── LEFT: Identity ── */}
+                        <div className="space-y-4">
+                            <SectionLabel>Identity</SectionLabel>
+
+                            {/* Photo — centred, clearly its own block */}
+                            <div className="flex flex-col items-center gap-1">
+                                <ImageUploader
+                                    label="Photo"
+                                    hint="Auto-compressed · ~250 KB max"
+                                    value={form.image_url}
+                                    onChange={(url) => onChange({ image_url: url })}
+                                    bucket="menu-images"
+                                    path={tenantImagePath(tenantId, "menu-item", `ai-${form.itemId}`)}
+                                    aspect="square" size={112} disabled={!tenantId}
+                                />
+                            </div>
+
+                            {/* Name */}
+                            <div className="space-y-1.5">
+                                <Label>
+                                    Name <span className="text-destructive text-xs">*</span>
+                                </Label>
+                                <Input
+                                    value={form.name}
+                                    onChange={(e) => onChange({ name: e.target.value })}
+                                    placeholder="e.g. Paneer Butter Masala"
+                                />
+                            </div>
+
+                            {/* Description */}
+                            <div className="space-y-1.5">
+                                <Label>Description</Label>
+                                <Textarea
+                                    value={form.description}
+                                    onChange={(e) => onChange({ description: e.target.value })}
+                                    placeholder="Short description shown on the QR menu…"
+                                    rows={3}
+                                    className="resize-none"
+                                />
+                            </div>
+                        </div>
+
+                        {/* ── RIGHT: Details ── */}
+                        <div className="space-y-4 mt-6 md:mt-0">
+                            <SectionLabel>Details</SectionLabel>
+
+                            {/* Category + Food type */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5 min-w-0">
+                                    <Label>
+                                        Category <span className="text-destructive text-xs">*</span>
+                                    </Label>
+                                    <Select value={form.category_name} onValueChange={(v) => onChange({ category_name: v })}>
+                                        <SelectTrigger className="w-full truncate">
+                                            <SelectValue placeholder="Pick category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {/* The "Create new" entry only appears when the
+                                              * extracted section name doesn't already match
+                                              * an existing tenant category. */}
+                                            {newCategorySentinel && (
+                                                <SelectItem value={newCategorySentinel}>
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <Plus className="h-3 w-3 text-primary" />
+                                                        Create &ldquo;{newCategoryLabel}&rdquo;
+                                                    </span>
+                                                </SelectItem>
+                                            )}
+                                            {existingCategories.map((c) => (
+                                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5 min-w-0">
+                                    <Label>Food type</Label>
+                                    <Select value={form.food_type} onValueChange={(v) => onChange({ food_type: v as FoodType })}>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {FOOD_TYPES.map((f) => (
+                                                <SelectItem key={f.value} value={f.value}>
+                                                    <span className="flex items-center gap-2">
+                                                        <span className={cn("h-2 w-2 rounded-full shrink-0", f.dot)} />
+                                                        {f.label}
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {/* Price + Sale price */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5 min-w-0">
+                                    <Label>
+                                        Price <span className="text-destructive text-xs">*</span>
+                                    </Label>
+                                    <Input
+                                        type="number" step="0.01" min="0"
+                                        value={form.base_price}
+                                        onChange={(e) => onChange({ base_price: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1.5 min-w-0">
+                                    <Label className="flex items-baseline gap-1">
+                                        Sale price
+                                        <span className="text-[10px] text-muted-foreground/60 font-normal">(opt.)</span>
+                                    </Label>
+                                    <Input
+                                        type="number" step="0.01" min="0" placeholder="—"
+                                        value={form.sale_price}
+                                        onChange={(e) => onChange({ sale_price: e.target.value })}
+                                    />
+                                    {salePriceFeedback}
+                                </div>
+                            </div>
+
+                            {/* Tax rate + Prep time */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5 min-w-0">
+                                    <Label>{taxCfg.taxShortName} rate</Label>
+                                    <Select value={form.gst_slab} onValueChange={(v) => onChange({ gst_slab: v })}>
+                                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            {mergedTaxRates(taxCfg, {
+                                                customRates: tenantCustomRates,
+                                                include: [Number(form.gst_slab)],
+                                            }).map((s) => (
+                                                <SelectItem key={s} value={String(s)}>{s}%</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5 min-w-0">
+                                    <Label>Prep time (min)</Label>
+                                    <Input
+                                        type="number" min="1"
+                                        value={form.prep_time_minutes}
+                                        onChange={(e) => onChange({ prep_time_minutes: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* HSN code — India only, full width so long descriptions don't overflow */}
+                            {tenantCountry === "IN" && (
+                                <div className="space-y-1.5">
+                                    <Label>HSN / SAC code</Label>
+                                    <Select value={form.hsn_code} onValueChange={(v) => onChange({ hsn_code: v })}>
+                                        <SelectTrigger className="w-full truncate">
+                                            <SelectValue placeholder="Pick HSN" />
+                                        </SelectTrigger>
+                                        <SelectContent position="popper" sideOffset={4}>
+                                            {hsnCodes.map((h) => (
+                                                <SelectItem key={h.code} value={h.code}>
+                                                    <span className="font-mono text-xs mr-2">{h.code}</span>
+                                                    <span className="text-muted-foreground">{h.description}</span>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+
+                            {/* Toggles */}
+                            <div className="space-y-2">
+                                <ToggleRow
+                                    label="Tax inclusive"
+                                    hint={`Price already includes ${taxCfg.taxShortName}.`}
+                                    checked={form.is_tax_inclusive}
+                                    onCheckedChange={(v) => onChange({ is_tax_inclusive: v })}
+                                />
+                                <ToggleRow
+                                    label="Active"
+                                    hint="Show on POS & QR menu."
+                                    checked={form.is_active}
+                                    onCheckedChange={(v) => onChange({ is_active: v })}
+                                />
+                                <ToggleRow
+                                    label="Sold out"
+                                    hint="Greyed out on the POS until you flip this off."
+                                    checked={form.is_sold_out}
+                                    onCheckedChange={(v) => onChange({ is_sold_out: v })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                </div>{/* end scrollable body */}
+
+                {/* ── Footer — always pinned at bottom ── */}
+                <DialogFooter className="shrink-0 px-6 py-4 border-t border-border/40 bg-muted/5 flex-row justify-between sm:justify-between gap-2">
+                    <Button type="button" variant="ghost" onClick={onSkip} disabled={saving}>
+                        <SkipForward className="h-4 w-4" /> Skip
+                    </Button>
+                    <Button type="button" variant="neon" onClick={onSave} disabled={saving} className="min-w-36">
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
+                        {index + 1 === total ? "Save & Finish" : "Save & Next"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+// ImageIcon is imported as a fallback for future use (empty-state
+// thumbnails etc.). The reference below stops the linter complaining.
+void ImageIcon

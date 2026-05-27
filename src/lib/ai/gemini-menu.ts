@@ -32,7 +32,10 @@ Output rules:
 - "price" is the base price as a plain number (no currency symbol). If unreadable, omit the item entirely.
 - If an item lists multiple sizes / portions (Half/Full, S/M/L, Regular/Large, etc), emit one item PER price with a "(Half)" / "(Full)" / "(S)" suffix on the name
 - "food_type": NON_VEG for chicken / mutton / lamb / beef / pork / fish / prawn / seafood; EGG for plain eggs / omelette / bhurji; otherwise VEG. Use VEGAN only if the menu explicitly labels something vegan.
-- "description": only when the menu actually shows a description line for the item. Null/omit otherwise — don't invent.
+- "description": ALWAYS provide a short customer-facing description (8-18 words, one sentence, no trailing period required).
+   - If the menu itself prints a description line, use that verbatim (lightly cleaned of OCR/typography artefacts).
+   - If the menu only shows the bare item name, write a concise description from common knowledge of the dish — key ingredients, cooking method, or flavour profile (e.g. "Slow-cooked black lentils in butter and cream" for Dal Makhani).
+   - Stay strictly factual: do not invent chef names, awards, certifications, "house special" claims, or spice levels beyond the dish's typical preparation. When in doubt, keep it generic ("Classic North-Indian curry") rather than risk a wrong specific.
 - Skip the restaurant name, address, page numbers, "menu" banners, contact details, and decorative ornaments.
 
 Return ONLY the JSON array — no prose, no explanation, no markdown fence.`
@@ -83,6 +86,15 @@ export async function extractMenuWithGemini(
             // Temperature 0 — we want deterministic extraction, not
             // creative interpretation.
             temperature: 0,
+            // gemini-2.5-flash is a "thinking" model — by default it
+            // burns 10-30+ extra seconds on hidden reasoning tokens
+            // before emitting the answer. Menu extraction is a
+            // straight vision/OCR task with no chain-of-thought win,
+            // so we hard-disable thinking to get 1.5-flash-class
+            // latency (3-8 s) back. Without this, the request
+            // routinely overshoots the AbortController timeout and
+            // Vercel's serverless function timeout.
+            thinkingConfig: { thinkingBudget: 0 },
             response_mime_type: "application/json",
             response_schema: {
                 type: "ARRAY",
@@ -113,11 +125,14 @@ export async function extractMenuWithGemini(
         },
     }
 
-    // 30s timeout — Gemini Flash usually responds in 3-8 seconds for a
-    // menu image. Anything over 30s is almost certainly a transient
-    // error worth retrying.
+    // 55s timeout — kept just under the route handler's
+    // `maxDuration = 60` so Vercel doesn't kill the function mid-
+    // fetch. Gemini Flash without thinking (see thinkingConfig above)
+    // typically responds in 3-8 s on a menu image; the extra
+    // headroom is for cold starts, large images, and occasional
+    // upstream hiccups.
     const ac = new AbortController()
-    const timer = setTimeout(() => ac.abort(), 30_000)
+    const timer = setTimeout(() => ac.abort(), 55_000)
     let r: Response
     try {
         r = await fetch(url, {

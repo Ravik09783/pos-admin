@@ -19,11 +19,16 @@ import { createMiddlewareClient } from "@/lib/supabase/middleware"
  *    app routes too, not just /, /login, /signup. The earlier "skip app
  *    routes, the layout already does getUser" reasoning was the bug.
  *
- * 2. AUTHED-VISITOR BOUNCE — a signed-in visitor landing on /, /login or
- *    /signup is redirected to /menu, so those pages stay static
+ * 2. AUTHED-VISITOR BOUNCE — a signed-in visitor landing on /login or
+ *    /signup is redirected to /menu, so those auth pages stay static
  *    prerenders instead of doing the check in-route. /menu is the
  *    role-aware launcher grid — admin AND staff get the same landing
  *    surface on sign-in (admins still have Dashboard one click away).
+ *
+ *    `/` is intentionally NOT in the bounce list: a logged-in user
+ *    can still visit the marketing landing page (handy for sharing a
+ *    link with a colleague, copying marketing copy, or just clicking
+ *    the logo to "go home").
  *
  * 3. SUBSCRIPTION LOCKOUT — when a tenant's trial is over and there's no
  *    active subscription, the app is paywalled: EVERY signed-in member
@@ -42,7 +47,7 @@ import { createMiddlewareClient } from "@/lib/supabase/middleware"
  * Real auth ENFORCEMENT still lives in `(app)/layout.tsx`; the proxy is
  * session upkeep + redirects, and is deliberately fail-open.
  */
-const BOUNCE_WHEN_AUTHED = ["/", "/login", "/signup"]
+const BOUNCE_WHEN_AUTHED = ["/login", "/signup"]
 const PUBLIC_PREFIXES = ["/qr", "/b/", "/api/public", "/api/webhooks", "/offline"]
 
 /**

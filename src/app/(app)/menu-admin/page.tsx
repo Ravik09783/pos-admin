@@ -968,7 +968,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ArrowRight, Ban, FolderInput, Lightbulb, Loader2, Pencil, Plus, Save, Settings2, Trash2, UtensilsCrossed } from "lucide-react"
+import { ArrowRight, Ban, Check, CheckSquare, FolderInput, Lightbulb, Loader2, Pencil, Plus, Save, Settings2, Square, Trash2, UtensilsCrossed, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -1101,6 +1101,15 @@ export default function MenuPage() {
     const [manageCatsOpen, setManageCatsOpen] = useState(false)
     const [catEdits,       setCatEdits]       = useState<Record<string, string>>({})
     const [catBusy,        setCatBusy]        = useState<string | null>(null)
+
+    // ── Bulk-select / bulk-delete ─────────────────────────────────
+    // selectionMode toggles a checkbox overlay on every card and
+    // surfaces a sticky bottom bar with the "Delete selected" action.
+    // Kept off by default so the grid stays uncluttered for everyday
+    // edits — the OWNER opts in via the "Select" button in the header.
+    const [selectionMode, setSelectionMode] = useState(false)
+    const [selectedIds,   setSelectedIds]   = useState<Set<string>>(new Set())
+    const [bulkBusy,      setBulkBusy]      = useState(false)
 
     async function refresh() {
         setLoading(true)
@@ -1348,6 +1357,51 @@ export default function MenuPage() {
         toast.success("Archived"); refresh()
     }
 
+    // ── Bulk-select helpers ──────────────────────────────────────
+    function toggleSelection(id: string) {
+        setSelectedIds((prev) => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id); else next.add(id)
+            return next
+        })
+    }
+
+    function exitSelectionMode() {
+        setSelectionMode(false)
+        setSelectedIds(new Set())
+    }
+
+    /** Soft-delete every selected item in one network round-trip
+     *  (same semantics as deleteItem — sets deleted_at + clears
+     *  image_url + purges the storage objects). Surface a count in
+     *  the confirm prompt so an accidental "Delete" on 47 items
+     *  doesn't slip through unnoticed. */
+    async function bulkDelete() {
+        const ids = Array.from(selectedIds)
+        if (ids.length === 0) return toast.error("Pick at least one item to delete.")
+        if (!confirm(`Archive ${ids.length} item${ids.length === 1 ? "" : "s"}? They will no longer appear on the POS.`)) return
+        setBulkBusy(true)
+        try {
+            const imagePaths = items
+                .filter((i) => selectedIds.has(i.id))
+                .map((i) => pathFromPublicUrl(i.image_url, "menu-images"))
+                .filter((p): p is string => Boolean(p))
+            const { error } = await supabase
+                .from("menu_items")
+                .update({ deleted_at: new Date().toISOString(), image_url: null } as never)
+                .in("id", ids)
+            if (error) throw error
+            if (imagePaths.length > 0) await deleteFromStorage(supabase, "menu-images", imagePaths)
+            toast.success(`Archived ${ids.length} item${ids.length === 1 ? "" : "s"}`)
+            exitSelectionMode()
+            refresh()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Bulk delete failed")
+        } finally {
+            setBulkBusy(false)
+        }
+    }
+
     async function toggleSoldOut(it: MenuItem) {
         const next = !it.is_sold_out
         setItems((prev) => prev.map((x) => x.id === it.id ? { ...x, is_sold_out: next } : x))
@@ -1384,7 +1438,10 @@ export default function MenuPage() {
     })()
 
     return (
-        <div className="container mx-auto py-6 md:py-8 px-4 max-w-7xl space-y-6">
+        <div className={cn(
+            "container mx-auto py-6 md:py-8 px-4 max-w-7xl space-y-6",
+            selectionMode && "pb-24",
+        )}>
             <PageTour tourKey="menu" />
             <PageHeader
                 kicker="Catalog"
@@ -1411,6 +1468,19 @@ export default function MenuPage() {
                             <Button variant="outline" onClick={() => setImportOpen(true)}>
                                 <ArrowRight className="h-4 w-4" /> Import from branch
                             </Button>
+                        )}
+                        {canManage && items.length > 0 && (
+                            selectionMode
+                                ? (
+                                    <Button variant="outline" onClick={exitSelectionMode}>
+                                        <X className="h-4 w-4" /> Cancel selection
+                                    </Button>
+                                )
+                                : (
+                                    <Button variant="outline" onClick={() => setSelectionMode(true)}>
+                                        <CheckSquare className="h-4 w-4" /> Select
+                                    </Button>
+                                )
                         )}
                         {canManage && (
                             <Button variant="neon" onClick={openCreate} disabled={categories.length === 0} data-tour="menu-add-item">
@@ -1466,11 +1536,13 @@ export default function MenuPage() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-tour="menu-grid">
                     {visibleItems.map((it) => {
                         const dot = FOOD_TYPES.find((f) => f.value === it.food_type)
+                        const isSelected = selectedIds.has(it.id)
                         return (
                             <Card
                                 key={it.id}
+                                onClick={selectionMode ? () => toggleSelection(it.id) : undefined}
                                 className={cn(
-                                    "neon-border flex flex-col overflow-hidden shadow-sm",
+                                    "neon-border flex flex-col overflow-hidden shadow-sm relative",
                                     "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-primary/40",
                                     it.is_sold_out && "opacity-75",
                                     // Inactive items don't ring up on POS —
@@ -1481,8 +1553,25 @@ export default function MenuPage() {
                                     // a dashed warning border so it stands
                                     // apart from a normal active card.
                                     !it.is_active && !it.is_sold_out && "opacity-70 border-warning/40 border-dashed",
+                                    // Selection-mode visuals — the cursor
+                                    // signals "click to toggle", and the
+                                    // selected ring lifts the card so the
+                                    // OWNER can scan a grid of 60+ items
+                                    // and immediately see what's marked.
+                                    selectionMode && "cursor-pointer",
+                                    selectionMode && isSelected && "ring-2 ring-primary border-primary/60",
                                 )}
                             >
+                                {selectionMode && (
+                                    <div
+                                        className="absolute top-2 left-2 z-10 grid place-items-center h-7 w-7 rounded-md bg-background/90 backdrop-blur border border-border shadow-sm"
+                                        aria-hidden
+                                    >
+                                        {isSelected
+                                            ? <Check className="h-4 w-4 text-primary" />
+                                            : <Square className="h-4 w-4 text-muted-foreground" />}
+                                    </div>
+                                )}
                                 {/* Image area: always rendered with a fixed 16:9
                                   * aspect so every card in the grid lines up,
                                   * regardless of whether an image was uploaded. */}
@@ -1538,6 +1627,13 @@ export default function MenuPage() {
                                         {it.hsn_code && <span className="text-xs text-muted-foreground">HSN {it.hsn_code}</span>}
                                     </div>
                                     {it.description && <p className="text-sm text-muted-foreground line-clamp-2">{it.description}</p>}
+                                    {/* Per-card action row is suppressed in
+                                      * selection mode so the only interaction
+                                      * is select/deselect — keeps clicks
+                                      * unambiguous and prevents the bubble-up
+                                      * from toggling selection while also
+                                      * firing Edit / Sold out / etc. */}
+                                    {!selectionMode && (
                                     <div className="flex items-center gap-2 pt-2 mt-auto flex-wrap">
                                         <Button size="sm" variant="outline" onClick={() => openEdit(it)}>
                                             <Pencil className="h-3.5 w-3.5" /> Edit
@@ -1583,10 +1679,80 @@ export default function MenuPage() {
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
                                     </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         )
                     })}
+                </div>
+            )}
+
+            {/* ════════════ BULK SELECTION BAR ════════════
+              * Fixed to the bottom of the viewport while selectionMode
+              * is on. Shows the current count + a "Select all visible"
+              * convenience (scoped to whatever the active category
+              * filter has narrowed down to) + the destructive bulk
+              * delete and a Cancel. Mirrors the /ai page's bottom-bar
+              * pattern so the two surfaces feel consistent. */}
+            {selectionMode && (
+                <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/85 backdrop-blur-xl">
+                    <div className="container mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-3 text-sm">
+                            <Badge variant={selectedIds.size > 0 ? "default" : "outline"} className="text-xs">
+                                {selectedIds.size} selected
+                            </Badge>
+                            <span className="text-muted-foreground hidden sm:inline">
+                                Tap a card to toggle.
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    // Toggle "select all visible": if every
+                                    // visible item is already selected, clear
+                                    // the selection; otherwise add them all.
+                                    const visibleIds = visibleItems.map((i) => i.id)
+                                    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id))
+                                    setSelectedIds((prev) => {
+                                        const next = new Set(prev)
+                                        if (allSelected) {
+                                            for (const id of visibleIds) next.delete(id)
+                                        } else {
+                                            for (const id of visibleIds) next.add(id)
+                                        }
+                                        return next
+                                    })
+                                }}
+                                disabled={visibleItems.length === 0 || bulkBusy}
+                            >
+                                {visibleItems.length > 0 && visibleItems.every((i) => selectedIds.has(i.id))
+                                    ? "Clear visible"
+                                    : `Select all ${activeCat === "ALL" ? "" : "visible "}(${visibleItems.length})`}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={exitSelectionMode}
+                                disabled={bulkBusy}
+                            >
+                                <X className="h-4 w-4" /> Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={bulkDelete}
+                                disabled={selectedIds.size === 0 || bulkBusy}
+                            >
+                                {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ""}
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             )}
 

@@ -23,6 +23,13 @@ import { createClient } from "@/lib/supabase/server"
  * 429 from Gemini, which we surface verbatim.
  */
 export const runtime = "nodejs"
+// Vercel's default serverless timeout is 10 s on Hobby, 15 s on Pro
+// without explicit configuration. Gemini vision can take 5-15 s on a
+// menu image (lower now that we disable the 2.5-flash thinking
+// budget, but spikes still happen), so we raise the cap to 60 s —
+// the maximum on Hobby and within Pro's 300 s ceiling. Without this
+// the function gets killed before Gemini's response lands.
+export const maxDuration = 60
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024 // 10 MB — Gemini accepts up to ~20 MB, but 10 MB is plenty for a menu photo and protects against accidental huge uploads.
 

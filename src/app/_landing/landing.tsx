@@ -4,7 +4,7 @@ import Link from "next/link"
 import dynamic from "next/dynamic"
 import { motion } from "framer-motion"
 import {
-    ArrowRight, BarChart3, Brain, Calendar, Check, ChefHat, Gift,
+    ArrowRight, BarChart3, Brain, Calendar, Camera, Check, ChefHat, Gift,
     Globe, Lock, Mail, MapPin, Menu, MessageCircle, Phone, Receipt,
     Sparkles, Star, Wallet, X, Zap,
 } from "lucide-react"
@@ -18,6 +18,7 @@ import { SITE_FAQ } from "@/lib/site"
 import { getPlans, formatPlanPrice, type PlanRegion } from "@/lib/billing/plans"
 import { HeroDevices } from "./hero-devices"
 import { CountUp } from "./count-up"
+import { AIMenuImportShowcase } from "./ai-menu-import-showcase"
 import { CAExportShowcase } from "./ca-export-showcase"
 import { HeadlineReveal, MouseParallax } from "./hero-effects"
 import { SectionHeading } from "./section-heading"
@@ -40,6 +41,7 @@ export function LandingPage() {
             <Hero />
             <TrustBar />
             <Features />
+            <AIMenuImportShowcase />
             <CAExportShowcase />
             <HowItWorks />
             <ComparisonTable />
@@ -263,6 +265,7 @@ export function TrustBar() {
 // ============ FEATURES ============
 export function Features() {
     const features = [
+        { icon: Camera, title: "AI Menu Import", desc: "Snap a photo of your printed menu — categories, items, prices and food types get auto-extracted. Review, tweak, save. Onboarding goes from hours to minutes." },
         { icon: Lock, title: "Bill Lock Security", desc: "Once a bill is generated, only the Owner can edit. Every change goes to an immutable audit log." },
         { icon: ChefHat, title: "Realtime Kitchen Display", desc: "Orders fly to the kitchen via WebSockets. Color-coded urgency. Multi-station routing." },
         { icon: Wallet, title: "Country-aware Tax Engine", desc: "GST, VAT or sales tax — computed per item, rounded correctly, inter-state / inter-region aware. Pick your country; we ship the rates (India, US states, EU, Gulf & more)." },
@@ -330,13 +333,13 @@ export function HowItWorks() {
     const steps = [
         {
             num: "01",
-            title: "Sign up + onboard in 15 minutes",
-            desc: "Email + password. Add your restaurant and pick your country — we set up the right tax model, currency and fiscal year. India also gets GSTIN / FSSAI fields and seeded HSN codes.",
+            title: "Sign up + pick your country",
+            desc: "Email + password. Add your restaurant and pick your country — we set up the right tax model, currency and fiscal year. India also gets GSTIN / FSSAI fields and seeded HSN codes. Two minutes, tops.",
         },
         {
             num: "02",
-            title: "Set up menu + tables, print QR codes",
-            desc: "Categories, items, tax rates, food types. Add tables, print branded QR cards. Configure Paytm UPI (or your local gateway) to receive payments.",
+            title: "Snap your menu — AI does the typing",
+            desc: "Upload a photo of your printed menu. Our AI extracts every category, item, price and food type — and writes a short description for each dish. Review the rows, hit save. Add tables and print branded QR cards in the same sitting.",
         },
         {
             num: "03",
@@ -348,8 +351,8 @@ export function HowItWorks() {
         <section className="container mx-auto px-4 py-20 md:py-28">
             <SectionHeading
                 kicker="How it works"
-                prefix="From signup to first bill in"
-                highlight="under an hour."
+                prefix="From a photo of your menu to your first bill in"
+                highlight="under 15 minutes."
                 className="mb-12 max-w-2xl"
             />
             <div className="relative grid md:grid-cols-3 gap-6">

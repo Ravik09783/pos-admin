@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -9,6 +10,8 @@ import {
     Building2,
     CalendarDays,
     ChefHat,
+    ChevronDown,
+    Clock,
     Coins,
     LayoutDashboard,
     LogOut,
@@ -149,6 +152,22 @@ const MORE_LINKS_BY_ROLE: Record<UserRole, Shortcut[]> = {
     ],
 }
 
+/** Ticks every 30 seconds — plenty for HH:MM display, and well
+ *  under the threshold where the re-render is worth caching about.
+ *  Initial value is null on the server so the client and server
+ *  markup match (Date.now() differs between them and would otherwise
+ *  hydrate-mismatch). We render the clock only once the client-side
+ *  effect has fired. */
+function useClock(): Date | null {
+    const [now, setNow] = useState<Date | null>(null)
+    useEffect(() => {
+        setNow(new Date())
+        const id = setInterval(() => setNow(new Date()), 30_000)
+        return () => clearInterval(id)
+    }, [])
+    return now
+}
+
 export function Topbar({
     tenantId,
     tenantName,
@@ -207,21 +226,86 @@ export function Topbar({
         router.refresh()
     }
 
+    // Two-letter initial used by the logo fallback. We take the
+    // first letter of the first two words so "Gopal Sweets" → "GS"
+    // (a tiny touch but it makes the avatar feel intentional rather
+    // than a generic placeholder).
+    const tenantInitials = tenantName
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((w) => w[0]?.toUpperCase() ?? "")
+        .join("") || "?"
+    // OWNER / MANAGER badges get a primary tint so admins stand
+    // apart at a glance; everyone else stays in the neutral outline.
+    const isAdminRole = role === "OWNER" || role === "MANAGER"
+    // Live clock — anchors the otherwise-empty middle of the bar.
+    // For restaurant staff it's a genuinely useful focal point
+    // (shift hand-offs, KDS prep windows, last-orders cut-offs).
+    const now = useClock()
+    const timeStr = now
+        ? now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+        : ""
+    const dateStr = now
+        ? now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })
+        : ""
+
     return (
-        <header className="h-14 border-b border-border/50 bg-card/40 backdrop-blur-xl flex items-center justify-between px-3 md:px-6 gap-2">
-            <div className="flex items-center gap-2 min-w-0">
+        <header className="relative h-16 border-b border-border/60 bg-card/60 backdrop-blur-xl flex items-center justify-between px-3 md:px-6 gap-3">
+            {/* Subtle gradient stripe along the bottom edge — gives the
+              * header a softer "lift" than a hard border alone and adds
+              * a brand-coloured anchor that ties into the page's
+              * primary→magenta gradient elsewhere. */}
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent"
+            />
+
+            {/* ── LEFT: Brand identity ───────────────────────────── */}
+            <div className="flex items-center gap-3 min-w-0">
                 {/* The card launcher — a topbar link to /menu, the full
                   * card grid that replaced the old sidebar. Reachable from
                   * any page including kiosk mode. */}
                 <MenuLauncher />
 
-                {tenantLogoUrl
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    ? <img src={tenantLogoUrl} alt="" className="h-7 w-7 rounded object-cover shrink-0 border border-border/60" />
-                    : null}
+                {/* Vertical divider — visually separates the navigation
+                  * launcher from the tenant-identity cluster so they
+                  * read as two distinct affordances. */}
+                <div className="h-7 w-px bg-border/60 shrink-0 hidden sm:block" aria-hidden />
+
+                {/* Logo tile — always white-backgrounded so dark-on-
+                  * transparent PNG logos remain visible in dark mode.
+                  * Fixed height, auto width: the container hugs the
+                  * logo's natural aspect ratio so wide wordmark-style
+                  * logos render at their proper proportions instead
+                  * of being squashed into a square. `max-w` caps a
+                  * runaway-wide logo at a sane size so the header
+                  * never gets visually swallowed.
+                  *
+                  * When no logo is uploaded yet, we fall back to a
+                  * square gradient initial tile that matches the user-
+                  * avatar styling for visual consistency. */}
+                {tenantLogoUrl ? (
+                    <div className="h-9 w-auto max-w-[140px] inline-flex items-center rounded-lg bg-white px-1.5 py-1 ring-1 ring-border/60 shadow-sm shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={tenantLogoUrl}
+                            alt=""
+                            className="h-full w-auto max-w-full object-contain"
+                        />
+                    </div>
+                ) : (
+                    <span
+                        aria-hidden
+                        className="h-9 w-9 rounded-lg grid place-items-center shrink-0 text-xs font-bold ring-1 ring-border/60 bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta)/0.2)] text-primary shadow-sm"
+                    >
+                        {tenantInitials}
+                    </span>
+                )}
+
                 <div className="flex flex-col min-w-0 leading-tight">
                     <span className="text-sm font-semibold truncate">{tenantName}</span>
-                    {showBranchLabel && branchLabel && (
+                    {showBranchLabel && branchLabel ? (
                         // key={activeBranchId} forces React to re-mount this
                         // span on switch — pairs with `animate-in fade-in` to
                         // visibly flash the new branch name in.
@@ -237,23 +321,65 @@ export function Topbar({
                             <Building2 className="h-3 w-3 shrink-0" />
                             <span className="truncate">{branchLabel}</span>
                         </span>
+                    ) : (
+                        // Subtle secondary line so the tenant block has
+                        // consistent two-line height across single- and
+                        // multi-branch tenants — keeps the header from
+                        // looking off-balance.
+                        <span className="text-[11px] text-muted-foreground/70 truncate hidden sm:inline">
+                            {ROLE_LABELS[role]} console
+                        </span>
                     )}
                 </div>
-                <Badge variant="outline" className="hidden sm:inline-flex shrink-0">{ROLE_LABELS[role]}</Badge>
+                <Badge
+                    variant={isAdminRole ? "default" : "outline"}
+                    className={cn(
+                        "hidden sm:inline-flex shrink-0 text-[10px] uppercase tracking-wider font-semibold",
+                        isAdminRole && "bg-primary/15 text-primary border-primary/30 hover:bg-primary/15",
+                    )}
+                >
+                    {ROLE_LABELS[role]}
+                </Badge>
                 <div className="hidden md:flex"><OfflineBanner tenantId={tenantId} /></div>
             </div>
 
-            <div className="flex items-center gap-1 shrink-0">
+            {/* ── CENTER: Live clock + date ──────────────────────────
+              * A small pill that anchors the otherwise-empty middle
+              * of the bar. Hidden on small screens (where the empty
+              * space doesn't exist and the bar is already tight) and
+              * suppressed on the server render to avoid hydration
+              * mismatch from Date(). For restaurant staff this is a
+              * genuinely useful focal point — shift hand-offs, KDS
+              * prep windows, last-orders cut-offs all want a glance
+              * at the time. */}
+            {now && (
+                <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-border/60 bg-muted/30 shrink-0">
+                    <Clock className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-sm font-semibold tabular-nums tracking-tight">{timeStr}</span>
+                    <span className="text-[11px] text-muted-foreground tabular-nums">·  {dateStr}</span>
+                </div>
+            )}
+
+            {/* ── RIGHT: Toolkit + avatar ────────────────────────── */}
+            <div className="flex items-center gap-2 shrink-0">
                 <div className="md:hidden"><OfflineBanner tenantId={tenantId} /></div>
-                <BranchSwitcher />
-                <NotificationPermissionButton />
-                <ThemeToggle />
+                {/* Grouped controls — branch switcher / notification
+                  * prompt / theme toggle all live in a single softly-
+                  * tinted "rail" so they read as one cluster rather
+                  * than three loose icons. Faint dividers between
+                  * the icon buttons emphasise the grouping without
+                  * overwhelming the visual. */}
+                <div className="flex items-center gap-0.5 rounded-lg bg-muted/30 border border-border/40 p-0.5 shrink-0">
+                    <BranchSwitcher />
+                    <NotificationPermissionButton />
+                    <ThemeToggle />
+                </div>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="gap-2 shrink-0 relative pl-1.5"
+                            className="gap-2 shrink-0 relative h-10 pl-1 pr-2 rounded-lg border border-border/40 bg-muted/30 hover:bg-muted/50 transition-colors"
                             aria-label={
                                 hasNotifications
                                     ? `Account menu, ${totalUnread} new ${totalUnread === 1 ? "notification" : "notifications"}`
@@ -282,7 +408,13 @@ export function Topbar({
                                         {(userName || userEmail).slice(0, 1).toUpperCase()}
                                     </span>
                                     : <UserIcon className="h-4 w-4" />}
-                            <span className="hidden sm:inline truncate max-w-[120px]">{userName || userEmail}</span>
+                            <span className="hidden sm:inline truncate max-w-[120px] text-sm">{userName || userEmail}</span>
+                            {/* Tiny chevron so the trigger reads as a
+                              * dropdown rather than a static avatar —
+                              * matters on touch devices where there's
+                              * no hover cue. Hidden on the smallest
+                              * breakpoint where the name is hidden too. */}
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground hidden sm:inline shrink-0" />
                             {/* Count pip — visible the moment a QR order
                               * lands or an admin posts an announcement,
                               * even without the dropdown open. Same
