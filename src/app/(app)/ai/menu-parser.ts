@@ -140,11 +140,44 @@ function isLikelyCurrencyArtifact(amount: number, line: string): boolean {
  * name. A line with no recognised price returns `null` so the caller
  * can treat it as a category header or description.
  */
+/**
+ * Fix the handful of letter↔digit confusions Tesseract makes in
+ * price-shaped contexts. ONLY safe to run on the trailing portion
+ * of a line we're already trying to parse as a price — never on
+ * dish-name text, which legitimately contains lowercase l's and
+ * uppercase O's.
+ *
+ *   O → 0    (common on round digits in stylised numerals)
+ *   l → 1    (common on "1" in serif fonts)
+ *   I → 1    (sans-serif "1" looks like an uppercase i)
+ *   S → 5    (occasional on stylised "5")
+ *   Z → 2    (rare but seen)
+ *   B → 8    (rare)
+ *
+ * We run the fix per-character only against tokens that already
+ * look mostly numeric (≥ 50 % digits) so a stray O inside a real
+ * word doesn't get mangled.
+ */
+function fixPriceConfusions(token: string): string {
+    const digitCount = (token.match(/\d/g) ?? []).length
+    if (digitCount === 0) return token
+    if (digitCount / token.length < 0.5) return token
+    return token
+        .replace(/O/g, "0")
+        .replace(/o(?=\d)|(?<=\d)o/g, "0")
+        .replace(/l/g, "1")
+        .replace(/I/g, "1")
+        .replace(/S(?=\d)|(?<=\d)S/g, "5")
+        .replace(/Z(?=\d)|(?<=\d)Z/g, "2")
+        .replace(/B(?=\d)|(?<=\d)B/g, "8")
+}
+
 function extractItemFromLine(line: string): { name: string; prices: number[] } | null {
     // Match a sequence of price tokens hugging the end. Each price
-    // looks like: optional currency symbol, 1-5 digits, optional
-    // decimal, optional "/-" tail.
-    const priceTokenRe = /([₹$€£]|rs\.?|inr|usd)?\s*([\d]{1,5}(?:[.,]\d{1,2})?)\s*\/?-?/gi
+    // looks like: optional currency symbol, 1-5 digits (or near-digit
+    // confusables like O/l/I/S/Z/B that we'll normalise below),
+    // optional decimal, optional "/-" tail.
+    const priceTokenRe = /([₹$€£]|rs\.?|inr|usd)?\s*([\dOolISZBs]{1,6}(?:[.,]\d{1,2})?)\s*\/?-?/gi
     // Walk from the end, collecting prices until we hit non-price text.
     const matches = [...line.matchAll(priceTokenRe)]
     if (matches.length === 0) return null
@@ -163,7 +196,7 @@ function extractItemFromLine(line: string): { name: string; prices: number[] } |
         // price is embedded inside the name (e.g. "Coffee (250 ml)").
         const between = line.slice(end, cursor)
         if (between && !/^[\s/,\-–—.•·]*$/.test(between)) break
-        const raw = m[2]!.replace(/,/g, ".")
+        const raw = fixPriceConfusions(m[2]!).replace(/,/g, ".")
         const amount = Number.parseFloat(raw)
         if (!Number.isFinite(amount) || amount < 1 || amount > 99_999) break
         trailing.unshift({ amount, start, end })

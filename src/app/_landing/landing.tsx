@@ -8,11 +8,12 @@ import {
     Globe, Lock, Mail, MapPin, Menu, MessageCircle, Phone, Receipt,
     Sparkles, Star, Wallet, X, Zap,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/app-shell/theme-toggle"
+import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { SITE_FAQ } from "@/lib/site"
 import { getPlans, formatPlanPrice, type PlanRegion } from "@/lib/billing/plans"
@@ -78,6 +79,30 @@ export function LandingShell({ children }: { children: React.ReactNode }) {
 export function Header() {
     const [scrolled, setScrolled] = useState(false)
     const [mobileNav, setMobileNav] = useState(false)
+    // Auth state — `null` while we don't know yet, `true` for signed-in,
+    // `false` for guests. We resolve it client-side via
+    // `getSession()` (which just reads the local cookie, no network
+    // round-trip) plus `onAuthStateChange` for hot swaps. The landing
+    // page stays a static prerender for guests — we just decide which
+    // header buttons to paint AFTER hydration, so SEO crawlers still
+    // see the marketing CTAs and authed users don't get nudged toward
+    // "Sign in" / "Start free trial" links they no longer need.
+    const supabase = useMemo(() => createClient(), [])
+    const [isAuthed, setIsAuthed] = useState<boolean | null>(null)
+    useEffect(() => {
+        let alive = true
+        supabase.auth.getSession().then(({ data }) => {
+            if (alive) setIsAuthed(!!data.session)
+        })
+        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (alive) setIsAuthed(!!session)
+        })
+        return () => {
+            alive = false
+            sub.subscription.unsubscribe()
+        }
+    }, [supabase])
+
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 20)
         window.addEventListener("scroll", onScroll, { passive: true })
@@ -110,8 +135,22 @@ export function Header() {
                 </nav>
                 <div className="hidden md:flex items-center gap-2">
                     <ThemeToggle />
-                    <Button asChild variant="ghost" size="sm"><Link href="/login">Sign in</Link></Button>
-                    <Button asChild variant="neon" size="sm"><Link href="/signup">Start free trial</Link></Button>
+                    {/* Auth-aware CTAs. While we don't know yet
+                      * (`isAuthed === null`) we render a width-reserving
+                      * placeholder so the header doesn't visibly jump
+                      * once the session resolves. */}
+                    {isAuthed === true ? (
+                        <Button asChild variant="neon" size="sm">
+                            <Link href="/menu">Open app <ArrowRight className="h-4 w-4" /></Link>
+                        </Button>
+                    ) : isAuthed === false ? (
+                        <>
+                            <Button asChild variant="ghost" size="sm"><Link href="/login">Sign in</Link></Button>
+                            <Button asChild variant="neon" size="sm"><Link href="/signup">Start free trial</Link></Button>
+                        </>
+                    ) : (
+                        <div className="h-9 w-[200px]" aria-hidden />
+                    )}
                 </div>
                 <div className="md:hidden flex items-center gap-1">
                     <ThemeToggle />
@@ -129,10 +168,22 @@ export function Header() {
                     {links.map((l) => (
                         <Link key={l.href} href={l.href} onClick={() => setMobileNav(false)} className="block text-sm text-muted-foreground hover:text-foreground">{l.label}</Link>
                     ))}
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/40">
-                        <Button asChild variant="outline" size="sm"><Link href="/login">Sign in</Link></Button>
-                        <Button asChild variant="neon" size="sm"><Link href="/signup">Start trial</Link></Button>
-                    </div>
+                    {isAuthed === true ? (
+                        <div className="pt-2 border-t border-border/40">
+                            <Button asChild variant="neon" size="sm" className="w-full">
+                                <Link href="/menu" onClick={() => setMobileNav(false)}>
+                                    Open app <ArrowRight className="h-4 w-4" />
+                                </Link>
+                            </Button>
+                        </div>
+                    ) : isAuthed === false ? (
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/40">
+                            <Button asChild variant="outline" size="sm"><Link href="/login" onClick={() => setMobileNav(false)}>Sign in</Link></Button>
+                            <Button asChild variant="neon" size="sm"><Link href="/signup" onClick={() => setMobileNav(false)}>Start trial</Link></Button>
+                        </div>
+                    ) : (
+                        <div className="pt-2 border-t border-border/40 h-9" aria-hidden />
+                    )}
                 </motion.div>
             )}
         </header>

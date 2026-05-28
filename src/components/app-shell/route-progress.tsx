@@ -22,39 +22,69 @@ export function RouteProgress() {
 
     const [active, setActive] = useState(false)
     const [width, setWidth] = useState(0)
+
+    // Every timer the component owns is parked in a ref so a fresh
+    // navigation can cancel a stale fadeout / safety-net firing from
+    // the previous one. Without this discipline the bar would either
+    // get stuck visible (preventDefault'd click → start() ran but
+    // pathname never changed → finish() never fires) or vanish
+    // mid-navigation (orphan fadeout setTimeout from the previous
+    // route flips `active` off after the next start() already lit it).
     const intervalRef = useRef<number | null>(null)
-    // Tracks where we are in the navigation lifecycle. Refs (not state) so the
-    // click listener doesn't need to be re-attached on every change.
+    const fadeoutRef = useRef<number | null>(null)
+    const safetyRef = useRef<number | null>(null)
     const startedRef = useRef(false)
 
-    function clearTimer() {
+    function clearAllTimers() {
         if (intervalRef.current != null) {
             window.clearInterval(intervalRef.current)
             intervalRef.current = null
         }
+        if (fadeoutRef.current != null) {
+            window.clearTimeout(fadeoutRef.current)
+            fadeoutRef.current = null
+        }
+        if (safetyRef.current != null) {
+            window.clearTimeout(safetyRef.current)
+            safetyRef.current = null
+        }
     }
 
     function start() {
+        // Already in flight — don't restart, otherwise rapid double-
+        // clicks reset the creep back to 12 %.
+        if (startedRef.current) return
         startedRef.current = true
+        clearAllTimers()
         setActive(true)
-        setWidth(12)            // initial burst — feels immediate
-        clearTimer()
-        // Creep upwards but never reach 100% until the route actually changes.
+        setWidth(12) // initial burst — feels immediate
+        // Creep upwards but never reach 100% until the route actually
+        // changes (or the safety-net fires).
         intervalRef.current = window.setInterval(() => {
             setWidth((w) => Math.min(w + Math.random() * 10, 85))
         }, 220)
+        // Safety net: if no pathname change lands within 5 s (link
+        // got preventDefault'd, navigation cancelled, redirect loop,
+        // stalled network), force-finish so the bar doesn't end up
+        // permanently stuck near 85 %.
+        safetyRef.current = window.setTimeout(() => {
+            finish()
+        }, 5000)
     }
 
     function finish() {
         if (!startedRef.current) return
         startedRef.current = false
-        clearTimer()
+        clearAllTimers()
         setWidth(100)
-        // brief pause so the user actually sees the full bar before it fades
-        window.setTimeout(() => {
+        // Brief pause so the user sees the full bar before it fades.
+        // Tracked in a ref so a brand-new navigation can cancel it
+        // and the new progress doesn't get clobbered.
+        fadeoutRef.current = window.setTimeout(() => {
             setActive(false)
             setWidth(0)
-        }, 200)
+            fadeoutRef.current = null
+        }, 150)
     }
 
     // Hook navigation completion: a pathname / search change means the new
@@ -74,6 +104,8 @@ export function RouteProgress() {
             const a = target?.closest("a")
             if (!a) return
             if (a.target === "_blank") return
+            // Anchors with `download` are file saves, not navigations.
+            if (a.hasAttribute("download")) return
             const href = a.getAttribute("href")
             if (!href) return
             if (href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("#")) return
@@ -92,7 +124,7 @@ export function RouteProgress() {
         return () => {
             document.removeEventListener("click", onClick, { capture: true })
             window.removeEventListener("popstate", onPopState)
-            clearTimer()
+            clearAllTimers()
         }
     }, [])
 
@@ -102,7 +134,11 @@ export function RouteProgress() {
             className="fixed top-0 left-0 right-0 z-[100] h-0.5 pointer-events-none"
             style={{
                 opacity: active ? 1 : 0,
-                transition: active ? "opacity 80ms" : "opacity 250ms ease-out 150ms",
+                // No transition-delay — when `active` flips off the bar
+                // should start fading immediately. The 150 ms hold-at-100
+                // pause inside finish() already gives the user the
+                // "full bar" beat before this fade kicks in.
+                transition: active ? "opacity 80ms" : "opacity 200ms ease-out",
             }}
         >
             <div

@@ -312,145 +312,98 @@ export function MenuExtractorClient({
         if (fileInputRef.current) fileInputRef.current.value = ""
     }
 
-    async function extract() {
-        if (!image) {
-            toast.error("Upload an image first.")
-            return
-        }
-        setStage("extracting")
-        setProgress(0)
-
-        // ── Enhanced (Gemini) path. The whole Tesseract pipeline is
-        //    bypassed — we POST the raw image to /api/ai/extract-menu,
-        //    Gemini returns structured sections directly.
-        if (mode === "enhanced") {
-            // Client-side abort at 65 s — slightly longer than the
-            // route's maxDuration=60 + the gemini-menu helper's 55 s
-            // AbortController so the server-side error reaches us
-            // before the browser gives up. Without this, a hung
-            // request leaves the user staring at the spinner forever.
-            const clientAc = new AbortController()
-            const clientTimer = setTimeout(() => clientAc.abort(), 65_000)
-            try {
-                const fd = new FormData()
-                fd.append("image", image.file)
-                // Indeterminate progress — Gemini doesn't stream so we
-                // don't have a real percentage. Bump it visibly so the
-                // bar doesn't look frozen.
-                setProgress(15)
-                const r = await fetch("/api/ai/extract-menu", {
-                    method: "POST",
-                    body: fd,
-                    signal: clientAc.signal,
-                })
-                setProgress(80)
-                const data = await r.json().catch(() => null) as
-                    | { ok: true; sections: Array<{ category: string; items: Array<{ name: string; description?: string | null; price: number; food_type?: FoodType }> }> }
-                    | { ok: false; error?: string }
-                    | { error: string }
-                    | null
-                setProgress(95)
-                if (!r.ok || !data || !("ok" in data) || data.ok !== true) {
-                    const msg = (data && "error" in data && data.error) || `Enhanced extraction failed (${r.status})`
-                    toast.error(msg)
-                    setStage("idle")
-                    return
-                }
-                const parsed: ParsedSection[] = data.sections
-                    .filter((s) => s.category && s.items.length > 0)
-                    .map((s) => ({
-                        category: s.category,
-                        items: s.items.map((it) => ({
-                            name: it.name,
-                            description: it.description ?? null,
-                            price: it.price ?? null,
-                            suggestedFoodType: it.food_type ?? "VEG",
-                        })),
-                    }))
-                if (parsed.length === 0) {
-                    toast.warning("Gemini didn't find any menu items — try a clearer photo or switch to Local mode.")
-                    setStage("idle")
-                    return
-                }
-                // No raw-OCR text to expose for re-parsing — Gemini
-                // returned structured JSON directly. Stash a tiny note
-                // so the "Show OCR text" panel still hides cleanly.
-                setRawText("")
-                setSections(toEditableSections(parsed, defaultGstSlab, defaultHsn))
-                setStage("review")
-                setProgress(100)
-                const total = parsed.reduce((s, c) => s + c.items.length, 0)
-                toast.success(`Extracted ${total} item${total === 1 ? "" : "s"} across ${parsed.length} categor${parsed.length === 1 ? "y" : "ies"}.`)
-            } catch (e) {
-                if (e instanceof Error && e.name === "AbortError") {
-                    toast.error("Enhanced extraction timed out (>65 s). Try a smaller / clearer image, or switch to Local mode.")
-                } else {
-                    toast.error(e instanceof Error ? e.message : "Couldn't reach the extraction service.")
-                }
-                setStage("idle")
-            } finally {
-                clearTimeout(clientTimer)
-            }
-            return
-        }
-
-        // ── Local (Tesseract) path. Existing flow.
+    /** Gemini-only extraction. Returns parsed sections on success, throws
+     *  with a human-readable message on any failure (network, 429 rate
+     *  limit, server error, timeout, empty response). The caller is
+     *  expected to catch and silently fall back to Local OCR — the
+     *  free-tier rate limit (~10 req/min, ~250 req/day on 2.5-flash)
+     *  is the most common reason a 5th-in-a-row import 429s out, and
+     *  we don't want to dead-end the OWNER's onboarding flow on it. */
+    async function runGeminiExtraction(file: File): Promise<ParsedSection[]> {
+        const clientAc = new AbortController()
+        const clientTimer = setTimeout(() => clientAc.abort(), 65_000)
         try {
-            // 1. PREPROCESS. In "auto" mode we keep the image whole
-            //    and let the bbox-based reflow do column detection.
-            //    In manual modes we pre-slice the image into N strips
-            //    (legacy behaviour, kept as an escape hatch when auto
-            //    misjudges the layout).
-            const manualColumns = columns === "auto" ? 1 : columns
-            const columnBlobs = await preprocessForOcr(image.file, { columns: manualColumns })
-
-            // Lazy-load Tesseract (~2 MB WASM) only on click.
-            const { createWorker, PSM } = await import("tesseract.js")
-            const worker = await createWorker("eng", undefined, {
-                logger: (m: { status: string; progress: number }) => {
-                    if (m.status === "recognizing text") {
-                        const slice = 100 / columnBlobs.length
-                        setProgress((prev) => {
-                            const base = Math.floor(prev / slice) * slice
-                            return Math.min(99, Math.round(base + m.progress * slice))
-                        })
-                    }
-                },
+            const fd = new FormData()
+            fd.append("image", file)
+            setProgress(15)
+            const r = await fetch("/api/ai/extract-menu", {
+                method: "POST",
+                body: fd,
+                signal: clientAc.signal,
             })
+            setProgress(80)
+            const data = await r.json().catch(() => null) as
+                | { ok: true; sections: Array<{ category: string; items: Array<{ name: string; description?: string | null; price: number; food_type?: FoodType }> }> }
+                | { ok: false; error?: string }
+                | { error: string }
+                | null
+            setProgress(95)
+            if (!r.ok || !data || !("ok" in data) || data.ok !== true) {
+                const msg = (data && "error" in data && data.error) || `Enhanced extraction failed (${r.status})`
+                throw new Error(msg)
+            }
+            return data.sections
+                .filter((s) => s.category && s.items.length > 0)
+                .map((s) => ({
+                    category: s.category,
+                    items: s.items.map((it) => ({
+                        name: it.name,
+                        description: it.description ?? null,
+                        price: it.price ?? null,
+                        suggestedFoodType: it.food_type ?? "VEG",
+                    })),
+                }))
+        } finally {
+            clearTimeout(clientTimer)
+        }
+    }
 
-            // PSM choice:
-            //   • Auto mode → PSM 3 (Tesseract's default automatic
-            //     page-segmentation, which preserves the original
-            //     line bboxes we need for column reflow).
-            //   • Manual mode → PSM 6 (single uniform block) — each
-            //     pre-sliced strip is treated as a single block of
-            //     text, which gives cleaner line ordering on tall
-            //     narrow strips.
-            // The char whitelist filters out checkbox / bullet / ₹
-            // glyphs at the OCR source so they never reach the parser.
+    /** Tesseract-only extraction. Runs the OCR pipeline + heuristic
+     *  parser, with an automatic second pass when the first PSM yields
+     *  no parseable items — different page-segmentation modes work
+     *  better on different menu layouts, so the retry materially
+     *  raises the floor on what we can read.
+     *
+     *  Returns the parsed sections AND the raw text (so the caller can
+     *  expose the "Show / edit OCR text" panel for manual fixups).
+     *  Throws when OCR itself fails. */
+    async function runLocalExtraction(file: File): Promise<{ sections: ParsedSection[]; rawText: string }> {
+        const manualColumns = columns === "auto" ? 1 : columns
+        const columnBlobs = await preprocessForOcr(file, { columns: manualColumns })
+
+        const { createWorker, PSM } = await import("tesseract.js")
+        type PsmValue = typeof PSM[keyof typeof PSM]
+        const worker = await createWorker("eng", undefined, {
+            logger: (m: { status: string; progress: number }) => {
+                if (m.status === "recognizing text") {
+                    const slice = 100 / columnBlobs.length
+                    setProgress((prev) => {
+                        const base = Math.floor(prev / slice) * slice
+                        return Math.min(99, Math.round(base + m.progress * slice))
+                    })
+                }
+            },
+        })
+
+        // The char whitelist filters out checkbox / bullet / ₹ glyphs
+        // at the OCR source so they never reach the parser. Kept tight
+        // by design — Tesseract is markedly more accurate when the set
+        // is restricted to ASCII + the punctuation we actually need.
+        const WHITELIST =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+            "abcdefghijklmnopqrstuvwxyz" +
+            "0123456789" +
+            " .,;:()-/&'+%"
+
+        /** One full pass at the chosen PSM. Word-level bboxes drive
+         *  the column-reflow pipeline in auto mode; manual mode just
+         *  joins the per-strip text. */
+        async function passAt(psm: PsmValue): Promise<string> {
             await worker.setParameters({
-                tessedit_pageseg_mode: columns === "auto" ? PSM.AUTO : PSM.SINGLE_BLOCK,
-                tessedit_char_whitelist:
-                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
-                    "abcdefghijklmnopqrstuvwxyz" +
-                    "0123456789" +
-                    " .,;:()-/&'+%",
+                tessedit_pageseg_mode: psm,
+                tessedit_char_whitelist: WHITELIST,
             })
-
-            let combined = ""
             if (columns === "auto") {
-                // Single OCR pass on the whole image with block-tree
-                // output enabled. We walk down to WORD level (not
-                // just line level) — the layout analyser needs each
-                // word's bbox to detect column breaks within a line.
-                //
-                // Tesseract groups left-and-right column row-N into
-                // one "line" with its bbox spanning the full width;
-                // the line-level approach was helpless against that.
-                // Word-level bboxes let us see the gap between
-                // "45" (last word of the left column row) and "Dal"
-                // (first word of the right column row) and break the
-                // line into two segments.
                 const { data } = await worker.recognize(columnBlobs[0]!, {}, { text: true, blocks: true })
                 const ocrWords: OcrWord[] = []
                 for (const block of data.blocks ?? []) {
@@ -468,47 +421,144 @@ export function MenuExtractorClient({
                         }
                     }
                 }
+                if (ocrWords.length === 0) return data.text ?? ""
+                const result = analyzeAndReflow(ocrWords)
+                if (result.columnCount >= 2) {
+                    toast.message(`Auto-detected ${result.columnCount} columns — re-flowed in reading order.`)
+                }
+                return result.text || (data.text ?? "")
+            }
+            // Manual N-column mode: OCR each pre-sliced strip and join.
+            const texts: string[] = []
+            for (const blob of columnBlobs) {
+                const { data } = await worker.recognize(blob)
+                texts.push(data.text ?? "")
+            }
+            return texts.join("\n\n")
+        }
 
-                if (ocrWords.length === 0) {
-                    combined = data.text ?? ""
-                } else {
-                    const result = analyzeAndReflow(ocrWords)
-                    combined = result.text || (data.text ?? "")
-                    if (result.columnCount >= 2) {
-                        toast.message(`Auto-detected ${result.columnCount} columns — re-flowed in reading order.`)
+        try {
+            // First pass uses the user-aligned PSM:
+            //   • Auto column mode → PSM.AUTO so the layout analyser sees
+            //     the original bbox tree.
+            //   • Manual mode → PSM.SINGLE_BLOCK on each strip.
+            const firstPsm = columns === "auto" ? PSM.AUTO : PSM.SINGLE_BLOCK
+            let combined = await passAt(firstPsm)
+            let parsed = parseMenuText(combined)
+
+            // Multi-PSM retry: if the first pass produced fewer than 3
+            // parseable items, try alternate page-segmentation modes
+            // and KEEP the one that yields the most items. Different
+            // menus respond to different PSMs — sparse-text layouts
+            // (PSM.SPARSE_TEXT) recover badly-laid menus the default
+            // mode drops, while SINGLE_BLOCK handles single-column
+            // typeset menus better than AUTO. Cheaper than asking the
+            // OWNER to fiddle with the column dropdown and re-extract.
+            const totalItems = (sections: ParsedSection[]) =>
+                sections.reduce((acc, s) => acc + s.items.length, 0)
+            if (totalItems(parsed) < 3) {
+                const altPsms: PsmValue[] = columns === "auto"
+                    ? [PSM.SINGLE_BLOCK, PSM.SPARSE_TEXT]
+                    : [PSM.AUTO, PSM.SPARSE_TEXT]
+                for (const alt of altPsms) {
+                    if (alt === firstPsm) continue
+                    const altText = await passAt(alt)
+                    const altParsed = parseMenuText(altText)
+                    if (totalItems(altParsed) > totalItems(parsed)) {
+                        combined = altText
+                        parsed = altParsed
                     }
+                    if (totalItems(parsed) >= 5) break // good enough
                 }
-            } else {
-                // Manual mode: OCR each pre-sliced strip, concatenate
-                // in column order.
-                const texts: string[] = []
-                for (const blob of columnBlobs) {
-                    const { data } = await worker.recognize(blob)
-                    texts.push(data.text ?? "")
-                }
-                combined = texts.join("\n\n")
             }
 
+            return { sections: parsed, rawText: combined }
+        } finally {
             await worker.terminate()
-            setProgress(100)
-            setRawText(combined)
+        }
+    }
 
-            // PARSE.
-            const parsed = parseMenuText(combined)
-            if (parsed.length === 0) {
-                toast.warning("OCR finished but no menu items were found — try a clearer image or switch the column setting.")
-                setShowRawText(true)
+    /** Orchestrator. Tries Gemini first when the OWNER picked
+     *  Enhanced mode, then silently falls back to Local OCR on any
+     *  Gemini failure (rate limit, network, server error, empty
+     *  response). The fallback decision is logged to the console with
+     *  the underlying error so a developer can still diagnose, but the
+     *  OWNER just sees a single success toast — the user experience
+     *  doesn't dead-end on a 429.
+     *
+     *  When the fallback DID fire, the success toast says so, and the
+     *  raw-OCR-text panel is auto-opened so the OWNER can manually
+     *  patch any items Tesseract missed compared to Gemini. */
+    async function extract() {
+        if (!image) {
+            toast.error("Upload an image first.")
+            return
+        }
+        setStage("extracting")
+        setProgress(0)
+
+        let parsed: ParsedSection[] | null = null
+        let extractedRawText = ""
+        let fellBackFromGemini = false
+
+        if (mode === "enhanced") {
+            try {
+                parsed = await runGeminiExtraction(image.file)
+            } catch (e) {
+                // Soft-fail Gemini and roll over to Tesseract. Logged
+                // to the console (not toast'd) so the OWNER's flow
+                // isn't interrupted — the silent-fallback behaviour
+                // is the whole point of this branch.
+                console.warn(
+                    "[ai/extract] Gemini failed to import — falling back to Local OCR.",
+                    e,
+                )
+                fellBackFromGemini = true
+            }
+        }
+
+        if (!parsed) {
+            try {
+                const result = await runLocalExtraction(image.file)
+                parsed = result.sections
+                extractedRawText = result.rawText
+            } catch (e) {
+                const msg = e instanceof Error ? e.message : "OCR failed"
+                toast.error(`Couldn't read the image: ${msg}`)
                 setStage("idle")
                 return
             }
-            setSections(toEditableSections(parsed, defaultGstSlab, defaultHsn))
-            setStage("review")
-            const total = parsed.reduce((s, c) => s + c.items.length, 0)
-            toast.success(`Extracted ${total} item${total === 1 ? "" : "s"} across ${parsed.length} categor${parsed.length === 1 ? "y" : "ies"} — review and tweak below.`)
-        } catch (e) {
-            const msg = e instanceof Error ? e.message : "OCR failed"
-            toast.error(`Couldn't read the image: ${msg}`)
+        }
+
+        setProgress(100)
+        setRawText(extractedRawText)
+
+        if (!parsed || parsed.length === 0) {
+            toast.warning(
+                fellBackFromGemini
+                    ? "Gemini was unavailable and Local OCR couldn't find menu items. Try a clearer photo or edit the OCR text below."
+                    : "OCR finished but no menu items were found — try a clearer image or switch the column setting.",
+            )
+            if (extractedRawText) setShowRawText(true)
             setStage("idle")
+            return
+        }
+
+        setSections(toEditableSections(parsed, defaultGstSlab, defaultHsn))
+        setStage("review")
+        const total = parsed.reduce((s, c) => s + c.items.length, 0)
+        if (fellBackFromGemini) {
+            // Open the raw-text panel automatically so the OWNER can
+            // patch anything Tesseract missed without hunting for it.
+            setShowRawText(true)
+            toast.success(
+                `Extracted ${total} item${total === 1 ? "" : "s"} via Local OCR. (Gemini was temporarily unavailable — used the offline fallback.)`,
+                { duration: 6000 },
+            )
+        } else {
+            toast.success(
+                `Extracted ${total} item${total === 1 ? "" : "s"} across ${parsed.length} categor${parsed.length === 1 ? "y" : "ies"}.`,
+            )
         }
     }
 
@@ -1229,12 +1279,31 @@ Veg Biryani               240`}</pre>
             {(stage === "review" || stage === "saving") && (
                 <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/85 backdrop-blur-xl">
                     <div className="container mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-                        <div className="text-xs text-muted-foreground">
-                            {totalItems > 0
-                                ? <>Ready to add <strong className="text-foreground">{totalItems}</strong> item{totalItems === 1 ? "" : "s"} to your menu.</>
-                                : "Add at least one item to save."}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>
+                                {totalItems > 0
+                                    ? <>Ready to add <strong className="text-foreground">{totalItems}</strong> item{totalItems === 1 ? "" : "s"} to your menu.</>
+                                    : "Add at least one item to save."}
+                            </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* Start over — discards every extracted row + the
+                              * uploaded image so the OWNER can upload a
+                              * different photo without scrolling back up to
+                              * the image card. Confirms first because it's
+                              * destructive of in-progress work. */}
+                            <Button
+                                variant="ghost"
+                                onClick={() => {
+                                    if (totalItems > 0 && !confirm(`Discard ${totalItems} extracted item${totalItems === 1 ? "" : "s"} and start over?`)) return
+                                    clearImage()
+                                }}
+                                disabled={stage === "saving"}
+                                title="Clear everything and upload a different image"
+                            >
+                                <X className="h-4 w-4" />
+                                Start over
+                            </Button>
                             <Button
                                 variant="outline"
                                 onClick={startReview}
