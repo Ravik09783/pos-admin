@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo } from "react"
-import { Check, Moon, Palette, PartyPopper, RotateCcw, Sun } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Check, ChevronDown, Moon, Palette, PartyPopper, RotateCcw, Sun, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -27,6 +27,14 @@ export function ThemeToggle({ align = "end" }: { align?: "start" | "center" | "e
     const { theme, setTheme, themes } = useTheme()
     const current = themes.find((t) => t.id === theme)
     const isDefault = theme === DEFAULT_THEME
+    // Controlled open state so the in-popup close button on mobile can
+    // dismiss the picker programmatically. Tap-outside still works
+    // (Radix handles that), this just gives mobile users an obvious
+    // affordance — tap-outside isn't always discoverable on touch.
+    const [open, setOpen] = useState(false)
+    // Resolve the default theme's display name from the catalog so the
+    // "Reset to <name>" label stays in sync if the default ever moves.
+    const defaultName = themes.find((t) => t.id === DEFAULT_THEME)?.name ?? "default"
 
     // Split into the three picker buckets once. Stable identity — the catalog
     // is a module-level constant that doesn't change at runtime.
@@ -43,7 +51,7 @@ export function ThemeToggle({ align = "end" }: { align?: "start" | "center" | "e
     }, [themes])
 
     return (
-        <DropdownMenu>
+        <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" title="Change theme" aria-label="Change theme">
                     <Palette className="h-4 w-4" />
@@ -57,9 +65,26 @@ export function ThemeToggle({ align = "end" }: { align?: "start" | "center" | "e
             >
                 <DropdownMenuLabel className="flex items-center justify-between gap-2 px-3 py-2">
                     <span>Theme</span>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                        {themes.length} options · {current?.mode ?? "—"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                            {themes.length} options · {current?.mode ?? "—"}
+                        </span>
+                        {/* Mobile-only close affordance — tap-outside still
+                          * works (Radix), this is the discoverable button
+                          * for touch users. Hidden on md+ where the
+                          * pointer-driven tap-outside is well understood. */}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="md:hidden h-7 w-7 -mr-1"
+                            onClick={() => setOpen(false)}
+                            aria-label="Close theme picker"
+                            title="Close"
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="m-0" />
 
@@ -100,7 +125,7 @@ export function ThemeToggle({ align = "end" }: { align?: "start" | "center" | "e
                         onClick={() => setTheme(DEFAULT_THEME)}
                     >
                         <RotateCcw className="h-3.5 w-3.5" />
-                        {isDefault ? "Already on Neon (default)" : "Reset to Neon"}
+                        {isDefault ? `Already on ${defaultName} (default)` : `Reset to ${defaultName}`}
                     </Button>
                 </div>
             </DropdownMenuContent>
@@ -123,16 +148,56 @@ function ThemeGroup({
     onPick: (id: ThemeDef["id"]) => void
     showModeGlyph: boolean
 }) {
+    // Collapsed by default on mobile so the picker fits without
+    // scrolling 23 cards. The group containing the currently-active
+    // theme starts open so the user immediately sees which theme is
+    // selected — they're not hunting for it in a closed accordion.
+    const containsCurrent = themes.some((t) => t.id === selectedId)
+    const [openMobile, setOpenMobile] = useState(containsCurrent)
+
     if (themes.length === 0) return null
     return (
         <section className="space-y-1.5">
-            <div className="flex items-center gap-1.5 px-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+            {/* Header is a button on mobile (taps toggle the group)
+              * and stays a non-interactive label from sm-up (where the
+              * grid is wide enough to show all groups expanded). */}
+            <button
+                type="button"
+                onClick={() => setOpenMobile((o) => !o)}
+                aria-expanded={openMobile}
+                className={cn(
+                    "w-full flex items-center gap-1.5 px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold",
+                    "rounded-md hover:bg-accent/40 transition-colors sm:hover:bg-transparent",
+                    "sm:pointer-events-none sm:py-0",
+                )}
+            >
                 {icon}
                 <span>{title}</span>
                 <span className="text-muted-foreground/60">· {themes.length}</span>
-            </div>
-            {/* Single column on mobile, two columns from sm-up. */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {containsCurrent && (
+                    <span className="ml-1 text-[9px] text-primary font-semibold normal-case tracking-normal">
+                        ● current
+                    </span>
+                )}
+                {/* Chevron — only on mobile. Rotates 180° when open. */}
+                <ChevronDown
+                    className={cn(
+                        "ml-auto h-3.5 w-3.5 transition-transform sm:hidden",
+                        openMobile && "rotate-180",
+                    )}
+                    aria-hidden
+                />
+            </button>
+            {/* Single column on mobile, two columns from sm-up. The
+              * `hidden`/`sm:grid` pair collapses the body on mobile when
+              * `openMobile` is false but keeps it permanently visible
+              * on desktop where space isn't a constraint. */}
+            <div
+                className={cn(
+                    "grid grid-cols-1 sm:grid-cols-2 gap-1.5",
+                    !openMobile && "hidden sm:grid",
+                )}
+            >
                 {themes.map((t) => (
                     <ThemeCard
                         key={t.id}

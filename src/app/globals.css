@@ -108,6 +108,55 @@
         --neon-amber:   38 92% 45%;
     }
 
+    /* ── POS Pro — black canvas · amber accent · flat businessware ────────
+     * Designed to look like the kind of restaurant-POS hardware UI you
+     * actually see in the field (Toast, Lightspeed, TouchBistro): near-
+     * black surfaces, one warm amber accent, no ambient washes, no glow,
+     * no gradients. Amber-on-black is a deliberate pick — it gives the
+     * primary button (`--primary` background, `--primary-foreground`
+     * black text) a ~14:1 contrast ratio that reads cleanly under
+     * harsh restaurant lighting. Every `--neon-*` variable is pointed
+     * at the same amber so any `bg-gradient-to-X from-primary to-
+     * neon-magenta` utility scattered through the codebase flattens
+     * visually to a single colour. The paired overrides further down
+     * (body wash, .glass, .neon-border, .text-gradient, shadow-glow)
+     * finish the job for the few utilities that can't be flattened
+     * via variables alone. */
+    html[data-theme="pos"] {
+        --background: 0 0% 4%;              /* near-black canvas */
+        --foreground: 0 0% 98%;             /* off-white text */
+        --card: 0 0% 8%;                    /* lifted surface */
+        --card-foreground: 0 0% 98%;
+        --popover: 0 0% 8%;
+        --popover-foreground: 0 0% 98%;
+        --primary: 38 92% 50%;              /* amber-500 — POS accent */
+        --primary-foreground: 0 0% 4%;      /* black text on amber buttons */
+        --secondary: 0 0% 14%;
+        --secondary-foreground: 0 0% 98%;
+        --muted: 0 0% 12%;
+        --muted-foreground: 0 0% 65%;       /* neutral mid-grey */
+        --accent: 0 0% 16%;
+        --accent-foreground: 0 0% 98%;
+        --destructive: 0 73% 55%;           /* red-500, slightly hotter on black */
+        --destructive-foreground: 0 0% 98%;
+        --success: 152 65% 48%;             /* emerald, bumped luminance for legibility */
+        --success-foreground: 0 0% 4%;
+        --warning: 38 92% 50%;              /* shares the amber accent */
+        --warning-foreground: 0 0% 4%;
+        --border: 0 0% 16%;                 /* hairline separators */
+        --input: 0 0% 14%;
+        --ring: 38 92% 50%;
+        /* All four neon-* point at primary so any multi-stop gradient
+         * using these flattens to a single colour (i.e. solid). */
+        --neon-cyan:    38 92% 50%;
+        --neon-magenta: 38 92% 50%;
+        --neon-lime:    38 92% 50%;
+        --neon-amber:   38 92% 50%;
+        /* Tighter corners than the neon default — businessware favours
+         * moderate radius, not the heavy rounding of the neon look. */
+        --radius: 0.5rem;
+    }
+
     html[data-theme="midnight"] {
         --background: 235 60% 4%;
         --foreground: 220 30% 96%;
@@ -855,6 +904,54 @@
     .text-gradient-warm {
         @apply bg-clip-text text-transparent;
         background-image: linear-gradient(120deg, hsl(var(--neon-amber)), hsl(var(--neon-magenta)));
+    }
+
+    /* ── POS Pro per-theme component overrides ────────────────────────
+     * The base utilities above bake in gradients / blur / glow that
+     * the POS Pro look explicitly rejects. Variable-level flattening
+     * (--neon-* → primary) handles inline gradient utilities; these
+     * rules finish the job for the few component classes that can't
+     * be neutralised purely via variables. */
+    html[data-theme="pos"] body {
+        background-image: none;          /* no ambient cyan/magenta wash */
+    }
+    html[data-theme="pos"] .glass,
+    html[data-theme="pos"] .glass-strong {
+        background-color: hsl(var(--card));
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+    html[data-theme="pos"] .neon-border {
+        /* Replace the neon ring + glow with a single hairline border.
+         * No drop shadow — black-on-black drop shadows are invisible,
+         * and the border alone gives the same surface-lift effect a
+         * real POS UI uses for card separation. */
+        box-shadow: 0 0 0 1px hsl(var(--border));
+    }
+    html[data-theme="pos"] .text-gradient,
+    html[data-theme="pos"] .text-gradient-warm {
+        /* Solid primary colour instead of the cyan→magenta sweep so
+         * marketing headlines read as one calm accent line. */
+        background-image: none;
+        color: hsl(var(--primary));
+        -webkit-text-fill-color: hsl(var(--primary));
+    }
+    /* Tailwind's `shadow-glow` / `shadow-glow-lg` utilities use
+     * --neon-cyan with high alpha; even when --neon-cyan = primary
+     * (amber here), the result is a noticeable coloured halo. Strip
+     * the glow to a hairline border on the black canvas — same
+     * card-lift effect without the neon halo. */
+    html[data-theme="pos"] .shadow-glow,
+    html[data-theme="pos"] .shadow-glow-lg {
+        box-shadow: 0 0 0 1px hsl(var(--border));
+    }
+    /* The hero ambient backgrounds + aurora wash live as `bg-`
+     * radial-gradient utilities; suppress them on the landing
+     * page when this theme is active so the page renders as a
+     * calm slate canvas rather than a neon backdrop. */
+    html[data-theme="pos"] .bg-grid,
+    html[data-theme="pos"] [class*="bg-radial"] {
+        background-image: none;
     }
     /* ── Themed scrollbars ────────────────────────────────────────────
        Default scrollbars across the app pick up the current theme colors

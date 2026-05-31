@@ -9,6 +9,7 @@ export type ThemeId =
     // Core
     | "neon"
     | "daylight"
+    | "pos"
     | "midnight"
     | "sunset"
     | "forest"
@@ -51,6 +52,7 @@ export const THEMES: ThemeDef[] = [
     // ── Core ────────────────────────────────────────────────────────────────
     { id: "neon",     name: "Neon",     blurb: "Electric cyan + magenta · the default",         mode: "dark",  category: "core",     swatches: ["#0a0e1a", "#22d3ee", "#e879f9"] },
     { id: "daylight", name: "Daylight", blurb: "Clean light mode",                              mode: "light", category: "core",     swatches: ["#ffffff", "#0891b2", "#0f172a"] },
+    { id: "pos",      name: "POS Pro",  blurb: "Black canvas · amber accent · flat & businesslike", mode: "dark", category: "core",  swatches: ["#0a0a0a", "#f59e0b", "#404040"] },
     { id: "midnight", name: "Midnight", blurb: "Deep navy, indigo accents",                     mode: "dark",  category: "core",     swatches: ["#06061a", "#818cf8", "#c084fc"] },
     { id: "sunset",   name: "Sunset",   blurb: "Warm violet with amber & magenta",              mode: "dark",  category: "core",     swatches: ["#1a0a1f", "#fb923c", "#ec4899"] },
     { id: "forest",   name: "Forest",   blurb: "Deep green with lime accents",                  mode: "dark",  category: "core",     swatches: ["#04221a", "#84cc16", "#34d399"] },
@@ -77,7 +79,7 @@ export const THEMES: ThemeDef[] = [
     { id: "halloween", name: "Halloween", blurb: "Pumpkin orange & witch violet on black",      mode: "dark",  category: "festival", swatches: ["#080503", "#f97316", "#a855f7"] },
 ]
 
-export const DEFAULT_THEME: ThemeId = "neon"
+export const DEFAULT_THEME: ThemeId = "pos"
 
 export const THEME_STORAGE_KEY = "restopos:theme"
 
