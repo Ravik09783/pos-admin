@@ -143,33 +143,33 @@ export default function POSPage() {
         displaySessionIdRef.current = id
         setDisplaySessionId(id)
     }
-    // True once a Paytm scan-to-pay QR is live on the customer display
+    // True once a PhonePe scan-to-pay QR is live on the customer display
     // (India). The checkout dialog then shows "Waiting for payment"
     // instead of the manual Generate button — the webhook owns billing
     // on this path, so the same sale can't be billed twice.
-    const [paytmAutoConfirm, setPaytmAutoConfirm] = useState(false)
+    const [phonepeAutoConfirm, setPhonePeAutoConfirm] = useState(false)
     // The resolved scan-to-pay QR payload for the current UPI checkout —
-    // a Paytm dynamic QR if Paytm is connected, else a plain merchant-UPI
+    // a PhonePe dynamic QR if PhonePe is connected, else a plain merchant-UPI
     // QR. This is the EXACT string the customer screen renders, so the
     // checkout dialog can show an identical QR to the staff.
     const [checkoutQr, setCheckoutQr] = useState<string | null>(null)
     // Non-null once we've determined UPI can't produce a QR — carries the
-    // reason (Paytm rejected it, nothing configured, …) so the dialog can
+    // reason (UPI gateway rejected it, nothing configured, …) so the dialog can
     // tell the cashier plainly instead of spinning on "Preparing…".
     const [checkoutQrError, setCheckoutQrError] = useState<string | null>(null)
-    // Why the QR is the MANUAL-UPI fallback rather than the Paytm
-    // dynamic QR (which auto-confirms via webhook). Null when Paytm
-    // was the path taken or no Paytm was configured. Surfaced on the
+    // Why the QR is the MANUAL-UPI fallback rather than the PhonePe
+    // dynamic QR (which auto-confirms via webhook). Null when PhonePe
+    // was the path taken or no PhonePe was configured. Surfaced on the
     // checkout dialog so the cashier knows it'll be a UTR-paste flow
     // and why — not a generic "no info, just enter the ref".
-    const [paytmFallbackReason, setPaytmFallbackReason] = useState<string | null>(null)
-    // Guards the Paytm display-checkout route from double-firing for the
+    const [phonepeFallbackReason, setPhonePeFallbackReason] = useState<string | null>(null)
+    // Guards the PhonePe display-checkout route from double-firing for the
     // same checkout session (React strict-mode / re-renders).
-    const paytmCheckoutFiredRef = useRef<string | null>(null)
-    // Live ref to paytmAutoConfirm so the once-registered pagehide /
+    const phonepeCheckoutFiredRef = useRef<string | null>(null)
+    // Live ref to phonepeAutoConfirm so the once-registered pagehide /
     // unmount handlers read the freshest value (see the Teardown effect).
-    const paytmAutoConfirmRef = useRef(false)
-    paytmAutoConfirmRef.current = paytmAutoConfirm
+    const phonepeAutoConfirmRef = useRef(false)
+    phonepeAutoConfirmRef.current = phonepeAutoConfirm
     // The payment method the cashier has picked in the checkout dialog.
     // Drives whether the customer display shows a scan-to-pay QR (UPI)
     // or none at all (Cash / Card). `…Ref` mirror for the async route
@@ -403,7 +403,7 @@ export default function POSPage() {
     // ── Recover an in-flight checkout after a POS refresh ───────────────
     // If a scan-to-pay QR was live when the screen reloaded, the in-memory
     // cart is gone — but the sale lives on in pos_display_sessions (+ the
-    // orders row + paytm_payment_events). Re-adopt it:
+    // orders row + phonepe_payment_events). Re-adopt it:
     //   PAID            → the customer already paid; acknowledge + reset.
     //   AWAITING/PROC.  → resume; the customer can still pay (the bill is
     //                     generated against the SAME order, no duplicate).
@@ -456,7 +456,7 @@ export default function POSPage() {
                 return
             }
 
-            // A Paytm scan-to-pay QR is live — the customer may be
+            // A PhonePe scan-to-pay QR is live — the customer may be
             // mid-payment and the webhook will bill it server-side. Resume
             // with the overlay; the PAID realtime subscription (it also
             // watches recoveredSale.sessionId) catches the confirmation.
@@ -1029,7 +1029,7 @@ export default function POSPage() {
                 notes: c.notes ?? null,
                 image_url: c.item.image_url ?? null,
                 // Net (pre-tax) line total + GST slab — carried so the
-                // Paytm display-checkout route can build GST-correct
+                // PhonePe display-checkout route can build GST-correct
                 // order_items. Extra fields; the display chrome ignores them.
                 gst_slab: Number(c.item.gst_slab) || 0,
                 taxable_amount: Number((netUnitPrice(c.item) * c.quantity).toFixed(2)),
@@ -1144,20 +1144,20 @@ export default function POSPage() {
     // that's no longer being rung up.
     useEffect(() => {
         const onHide = () => {
-            // Don't tear the session down while a Paytm scan-to-pay QR is
+            // Don't tear the session down while a PhonePe scan-to-pay QR is
             // live: the customer may have scanned it and could still pay
             // (a stray refresh / tab-switch must not orphan that). The
             // webhook needs the display-session row to survive so the
             // customer's screen can flip to "Thank you" when they pay.
             // (The payment + bill are guaranteed safe regardless — this
             // only preserves the live screen feedback.)
-            if (paytmAutoConfirmRef.current) return
+            if (phonepeAutoConfirmRef.current) return
             void supabase.rpc("clear_pos_display" as never).then(() => {}, () => {})
         }
         window.addEventListener("pagehide", onHide)
         return () => {
             window.removeEventListener("pagehide", onHide)
-            if (displaySessionIdRef.current && !paytmAutoConfirmRef.current) {
+            if (displaySessionIdRef.current && !phonepeAutoConfirmRef.current) {
                 void supabase.rpc("clear_pos_display" as never).then(() => {}, () => {})
                 syncDisplaySession(null)
             }
@@ -1185,11 +1185,11 @@ export default function POSPage() {
 
     // ── India: the customer-screen QR mirrors the cashier's method ─────
     // The customer display reads `checkout_url`:
-    //   • a `upi:` intent / Paytm QR → renders a scan-to-pay QR
+    //   • a `upi:` intent / PhonePe QR → renders a scan-to-pay QR
     //   • `counter:card`             → "hand your card to staff to swipe"
     //   • null                        → "pay with cash at the counter"
-    // For UPI, ONE server route resolves the QR (Paytm dynamic QR if the
-    // owner connected Paytm → otherwise a plain merchant-UPI QR) and
+    // For UPI, ONE server route resolves the QR (PhonePe dynamic QR if the
+    // owner connected PhonePe → otherwise a plain merchant-UPI QR) and
     // writes it to checkout_url. The customer screen AND the staff dialog
     // render that exact same value — there is no second QR-building path.
     useEffect(() => {
@@ -1205,11 +1205,11 @@ export default function POSPage() {
         if (checkoutMethod !== "UPI") {
             // Cash / Card — no scan QR. Stamp the sentinel so the customer
             // screen shows the right prompt; clears any earlier UPI QR.
-            setPaytmAutoConfirm(false)
-            setPaytmFallbackReason(null)
+            setPhonePeAutoConfirm(false)
+            setPhonePeFallbackReason(null)
             setCheckoutQr(null)
             setCheckoutQrError(null)
-            paytmCheckoutFiredRef.current = null
+            phonepeCheckoutFiredRef.current = null
             void supabase
                 .from("pos_display_sessions")
                 .update({
@@ -1226,11 +1226,11 @@ export default function POSPage() {
         // server-side and writes checkout_url; we mirror its result onto
         // the staff dialog (`checkoutQr` / `checkoutQrError`).
         if (!totals || totals.grand_total <= 0) return
-        if (paytmCheckoutFiredRef.current === sid) return
-        paytmCheckoutFiredRef.current = sid
+        if (phonepeCheckoutFiredRef.current === sid) return
+        phonepeCheckoutFiredRef.current = sid
         setCheckoutQrError(null)
         // Flip the customer screen to a UPI "preparing" state RIGHT NOW —
-        // the instant the cashier picks UPI, before the Paytm round-trip —
+        // the instant the cashier picks UPI, before the PhonePe round-trip —
         // so the customer never sits on the previous (e.g. "pay cash")
         // panel while the real QR is being minted. The async block below
         // swaps this sentinel for the actual QR a beat later.
@@ -1240,46 +1240,48 @@ export default function POSPage() {
             .eq("created_by", userId)
             .then(() => {}, () => {})
         ;(async () => {
+            // Resolve the dynamic UPI QR via the PhonePe display-checkout
+            // route. The route mints a `phonepe_payment_events` row +
+            // calls PhonePe with instrument=UPI_INTENT and returns either:
+            //   { ok: true, qr_data, auto_confirm, checkout_session_id }
+            //   { ok: false, reason: "not_configured" }   ← owner hasn't set up PhonePe
+            //   { ok: false, phonepe_error: "..." }       ← PhonePe rejected the mint
+            // The cashier UI maps each case to either the QR panel or
+            // the right "couldn't prepare" notice.
             let qrData: string | null = null
             let autoConfirm = false
             let sessionRef: string | null = null
             let notConfigured = false
             let transportErr: string | null = null
-            // Why the route fell back to manual UPI (if it did) — null
-            // when Paytm succeeded OR when Paytm wasn't configured at
-            // all. Surfaces on the cashier dialog as a small "Paytm
-            // failed, using fallback" note next to the QR.
             let fallbackReason: string | null = null
             try {
-                const r = await fetch("/api/payments/paytm/display-checkout", {
+                const r = await fetch("/api/payments/phonepe/display-checkout", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ display_session_id: sid }),
                 })
-                const b = await r.json().catch(() => null) as {
-                    ok?: boolean; qr_data?: string; auto_confirm?: boolean
+                const data = await r.json().catch(() => null) as {
+                    ok?: boolean
+                    qr_data?: string | null
+                    auto_confirm?: boolean
                     checkout_session_id?: string | null
-                    reason?: string; error?: string; detail?: string
-                    paytm_error?: string | null
-                    mode?: string
+                    reason?: string | null
+                    phonepe_error?: string | null
+                    error?: string | null
                 } | null
-                if (r.ok && b?.ok && typeof b.qr_data === "string") {
-                    qrData = b.qr_data
-                    autoConfirm = !!b.auto_confirm
-                    sessionRef = b.checkout_session_id ?? null
-                    // We got a QR back — if the route fell through from
-                    // a failed Paytm attempt to the manual-UPI path, it
-                    // included `paytm_error`. Stash the reason so the
-                    // cashier dialog can explain why it's a UTR-paste
-                    // flow instead of the auto-confirm one.
-                    fallbackReason = (!autoConfirm && b.paytm_error) ? b.paytm_error : null
-                } else if (r.ok && b?.ok === false && b?.reason === "not_configured") {
+                if (data?.ok && data.qr_data) {
+                    qrData = data.qr_data
+                    autoConfirm = !!data.auto_confirm
+                    sessionRef = data.checkout_session_id ?? null
+                } else if (data?.reason === "not_configured") {
                     notConfigured = true
                 } else {
-                    transportErr = b?.detail || b?.error || "the payment service didn't respond"
+                    transportErr = data?.phonepe_error ?? data?.error ?? `HTTP ${r.status}`
+                    fallbackReason = transportErr
                 }
-            } catch {
-                transportErr = "the payment service couldn't be reached"
+            } catch (e) {
+                transportErr = e instanceof Error ? e.message : "Network error"
+                fallbackReason = transportErr
             }
             // The cashier switched away from UPI while the route resolved.
             // The Cash/Card branch has already stamped the right value on
@@ -1288,8 +1290,8 @@ export default function POSPage() {
             if (checkoutMethodRef.current !== "UPI") return
             if (qrData) {
                 setCheckoutQr(qrData)
-                setPaytmAutoConfirm(autoConfirm)
-                setPaytmFallbackReason(fallbackReason)
+                setPhonePeAutoConfirm(autoConfirm)
+                setPhonePeFallbackReason(fallbackReason)
                 // The POS owns the checkout_url write — gated on the live
                 // method above — so the customer screen shows exactly this
                 // QR. AWAITED (a bare `void builder` never sends the
@@ -1302,11 +1304,11 @@ export default function POSPage() {
                 if (urlErr) logError(urlErr, { scope: "pos:checkout_url_write", userId })
             } else {
                 setCheckoutQr(null)
-                setPaytmAutoConfirm(false)
-                setPaytmFallbackReason(null)
+                setPhonePeAutoConfirm(false)
+                setPhonePeFallbackReason(null)
                 setCheckoutQrError(
                     notConfigured
-                        ? "The owner hasn't set up a payment method yet — add Paytm or a UPI ID to accept UPI."
+                        ? "The owner hasn't set up a payment method yet — add PhonePe or a UPI ID to accept UPI."
                         : `Couldn't prepare the UPI QR — ${transportErr}.`,
                 )
                 // No QR — show the customer a neutral "staff will help"
@@ -1326,9 +1328,9 @@ export default function POSPage() {
     // sale starts clean and the route can fire again.
     useEffect(() => {
         if (!checkoutOpen) {
-            paytmCheckoutFiredRef.current = null
-            setPaytmAutoConfirm(false)
-            setPaytmFallbackReason(null)
+            phonepeCheckoutFiredRef.current = null
+            setPhonePeAutoConfirm(false)
+            setPhonePeFallbackReason(null)
             setCheckoutQr(null)
             setCheckoutQrError(null)
             setCheckoutMethod("CASH")
@@ -1336,7 +1338,7 @@ export default function POSPage() {
     }, [checkoutOpen])
 
     // ── Auto-confirm: react when the webhook flips OUR display session
-    //    to PAID (the customer paid the Paytm QR). Close the checkout
+    //    to PAID (the customer paid the PhonePe QR). Close the checkout
     //    dialog, tell the cashier, and reset for the next sale — the
     //    cashier verifies nothing.
     // Watch the live checkout session OR a recovered one (after a refresh)
@@ -1363,13 +1365,17 @@ export default function POSPage() {
                     // Mirror the customer screen's QR payload onto the staff
                     // dialog. Both now read the SAME
                     // pos_display_sessions.checkout_url row — whatever the
-                    // POS (plain UPI) or the Paytm route (dynamic QR) wrote
+                    // POS (plain UPI) or the PhonePe route (dynamic QR) wrote
                     // — so the staff and customer QR can never differ. A
                     // `counter:` sentinel (cash / card) or null is not a
                     // scannable QR.
                     const url = typeof row?.checkout_url === "string" ? row.checkout_url : null
                     setCheckoutQr(url && !/^counter:/i.test(url) ? url : null)
                     if (row?.status !== "PAID") return
+                    // The bill is generated server-side by the PhonePe
+                    // webhook (confirm_phonepe_payment) — by the time
+                    // status=PAID lands here, invoice_number is already set
+                    // and the bill row exists. We just clean up the UI.
                     toast.success(
                         row.invoice_number
                             ? `Payment received — invoice ${row.invoice_number}`
@@ -1382,10 +1388,10 @@ export default function POSPage() {
                     setCustomer(null)
                     setCustomerPhone("")
                     setCheckoutDetails({ name: "", phone: "", email: "" })
-                    setPaytmAutoConfirm(false)
-                    setPaytmFallbackReason(null)
+                    setPhonePeAutoConfirm(false)
+                    setPhonePeFallbackReason(null)
                     setRecoveredSale(null)
-                    paytmCheckoutFiredRef.current = null
+                    phonepeCheckoutFiredRef.current = null
                     syncDisplaySession(null)
                     // Let the customer see the "Thank you" screen, then
                     // tear the display session down.
@@ -2974,7 +2980,7 @@ export default function POSPage() {
                 generationStage={generationStage}
                 qrPayload={checkoutQr}
                 qrError={checkoutQrError}
-                paytmFallbackReason={paytmFallbackReason}
+                phonepeFallbackReason={phonepeFallbackReason}
                 canSetupPayments={userRole === "OWNER" || userRole === "MANAGER"}
                 couponBusy={couponBusy}
                 giftCardBusy={giftCardBusy}
@@ -2986,7 +2992,7 @@ export default function POSPage() {
                 onRemoveGiftCard={removeGiftCard}
                 onCustomerDetailsChange={setCheckoutDetails}
                 onPaymentMethodChange={setCheckoutMethod}
-                paytmAutoConfirm={paytmAutoConfirm}
+                phonepeAutoConfirm={phonepeAutoConfirm}
             />
 
             {recoveredSale && (

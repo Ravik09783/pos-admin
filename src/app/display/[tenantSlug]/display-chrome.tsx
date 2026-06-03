@@ -462,7 +462,7 @@ function CheckoutStage({
                             `counter:upi-error`   → UPI picked but unavailable
                             `https://…`      → Stripe Checkout QR
                             null / empty     → pay cash at the counter
-                            anything else    → a scannable UPI / Paytm QR */}
+                            anything else    → a scannable UPI / PhonePe QR */}
                         {session.checkout_url === "counter:card" ? (
                             <CardSwipePanel session={session} />
                         ) : session.checkout_url === "counter:upi-pending" ? (
@@ -474,7 +474,7 @@ function CheckoutStage({
                         ) : session.checkout_url && !/^counter:/i.test(session.checkout_url) ? (
                             // Any non-sentinel, non-Stripe payload is a
                             // scannable payment QR — a plain `upi:` intent
-                            // or a Paytm dynamic QR, whatever its format.
+                            // or a PhonePe dynamic QR, whatever its format.
                             <UpiScanPanel session={session} />
                         ) : (
                             <CounterPayPanel session={session} />
@@ -761,12 +761,12 @@ function BuildingHintPanel() {
 
 /**
  * UPI scan-to-pay panel. The POS puts a `upi:` intent on `checkout_url`
- * whenever the cashier picks UPI. `checkout_session_id` set → a Paytm
+ * whenever the cashier picks UPI. `checkout_session_id` set → a PhonePe
  * dynamic QR (webhook auto-confirms); null → a plain UPI QR (cashier
  * confirms manually).
  */
 /** Pull the payee UPI ID (the `pa` parameter) out of a `upi://pay?…`
- *  string — works for a plain UPI intent and a Paytm dynamic QR alike. */
+ *  string — works for a plain UPI intent and a PhonePe dynamic QR alike. */
 function upiIdFromIntent(value: string): string | null {
     const m = /[?&]pa=([^&]+)/i.exec(value)
     if (!m || !m[1]) return null
@@ -812,7 +812,7 @@ function UpiScanPanel({ session }: { session: PosDisplaySession }) {
                     <span className="text-sm font-medium">{upiId}</span>
                 </div>
             )}
-            <div className="mt-3 text-xs text-muted-foreground">Google Pay · PhonePe · Paytm · BHIM</div>
+            <div className="mt-3 text-xs text-muted-foreground">Google Pay · PhonePe · PhonePe · BHIM</div>
             <p className="mt-1.5 text-xs text-muted-foreground">
                 {isAuto
                     ? "Confirms automatically once you pay"
@@ -826,7 +826,7 @@ function UpiScanPanel({ session }: { session: PosDisplaySession }) {
  * UPI just picked on the POS, the QR still being minted (the
  * `counter:upi-pending` sentinel). Shows the customer the switch happened
  * INSTANTLY — a UPI frame with a spinner — instead of leaving them on the
- * previous panel while the Paytm round-trip completes.
+ * previous panel while the PhonePe round-trip completes.
  */
 function UpiPreparingPanel({ session }: { session: PosDisplaySession }) {
     return (
@@ -849,7 +849,7 @@ function UpiPreparingPanel({ session }: { session: PosDisplaySession }) {
 }
 
 /**
- * UPI was picked but no QR could be issued (`counter:upi-error`) — Paytm
+ * UPI was picked but no QR could be issued (`counter:upi-error`) — PhonePe
  * unreachable, or no payment method configured. A neutral prompt — staff
  * will sort the payment out — rather than a misleading "pay cash".
  */

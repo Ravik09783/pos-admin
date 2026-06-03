@@ -412,7 +412,7 @@ function compactCurrency(v: number, currency: string): string {
 }
 
 const METHOD_LABELS: Record<string, string> = {
-    CASH: "Cash", UPI: "UPI", CARD: "Card", PAYTM: "Paytm",
+    CASH: "Cash", UPI: "UPI", CARD: "Card", PAYTM: "PhonePe",
     STRIPE: "Stripe", RAZORPAY: "Razorpay", PHONEPE: "PhonePe",
     BANK_TRANSFER: "Bank", GIFT_CARD: "Gift card", LOYALTY: "Loyalty",
     COMPLIMENTARY: "Comp", CREDIT: "Credit", OTHER: "Other",

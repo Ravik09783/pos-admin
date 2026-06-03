@@ -48,7 +48,13 @@ import { createMiddlewareClient } from "@/lib/supabase/middleware"
  * session upkeep + redirects, and is deliberately fail-open.
  */
 const BOUNCE_WHEN_AUTHED = ["/login", "/signup"]
-const PUBLIC_PREFIXES = ["/qr", "/b/", "/api/public", "/api/webhooks", "/offline"]
+// `/auth/impersonate-land` is the landing page for super-admin
+// impersonation magic links. Adding it here keeps the proxy from
+// refreshing whatever cookies the browser tab arrived with — the
+// client-side `AuthHashHandler` is about to swap them for the
+// impersonated user's session, and any concurrent server-side
+// cookie write here would race the swap.
+const PUBLIC_PREFIXES = ["/qr", "/b/", "/api/public", "/api/webhooks", "/offline", "/auth/impersonate-land"]
 
 /**
  * Paths exempt from the subscription lockout — auth pages, onboarding,

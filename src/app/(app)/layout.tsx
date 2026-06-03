@@ -124,7 +124,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
              *  page they're on. The sidebar badge already shows the count;
              *  this surfaces the event so it's hard to miss. */}
             <QrOrderNotifier tenantId={appUser.tenant_id as string} />
-            {/* Toast on every online payment (Paytm/Stripe/etc.) — the
+            {/* Toast on every online payment (PhonePe/Stripe/etc.) — the
              *  webhook inserts a payments row, this subscription picks it
              *  up in realtime so the dashboard "dings" when money arrives. */}
             <PaymentNotifier tenantId={appUser.tenant_id as string} />

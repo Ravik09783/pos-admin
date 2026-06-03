@@ -7,7 +7,7 @@
  *
  *   - CASH      → physical money they need to hand over / count.
  *   - ONLINE    → digital settlement (UPI, card, bank transfer, Razorpay,
- *                 Stripe, PhonePe, Paytm). They didn't touch it; the bank
+ *                 Stripe, PhonePe, PhonePe). They didn't touch it; the bank
  *                 did. Useful for matching the gateway dashboard, not the
  *                 cash drawer.
  *   - OTHER     → loyalty / gift-card redemption / complimentary / on-credit.
@@ -74,7 +74,7 @@ export const METHOD_LABEL: Record<PaymentMethod, string> = {
     CARD: "Card",
     RAZORPAY: "Razorpay",
     PHONEPE: "PhonePe",
-    PAYTM: "Paytm",
+    PAYTM: "PhonePe",
     STRIPE: "Stripe",
     BANK_TRANSFER: "Bank transfer",
     CREDIT: "On account",

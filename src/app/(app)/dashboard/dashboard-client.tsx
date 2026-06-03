@@ -709,7 +709,7 @@ function SetupCard({ setup }: { setup: SetupState }) {
                     <SetupStep done={setup.hasTables} num={2} href="/tables" icon={Building2} label="Add your tables"
                         sub={setup.hasTables ? `${setup.tableCount} tables` : "Floor plan for dine-in"} />
                     <SetupStep done={setup.hasPayment} num={3} href="/settings/payments" icon={Zap} label="Configure payments"
-                        sub={setup.hasPayment ? "Configured" : "Paytm or UPI"} />
+                        sub={setup.hasPayment ? "Configured" : "PhonePe or UPI"} />
                 </div>
             </div>
         </div>
@@ -799,7 +799,7 @@ function MyTodayCard({ userId, currency }: { userId: string; currency: string })
             // Split what the cashier collected by how they account for it
             // at close: CASH (physical drawer), CARD (receipts to submit),
             // and UPI (manual UPI they verified). Auto-confirmed UPI from
-            // the Paytm webhook never lands here — those payment rows have
+            // the PhonePe webhook never lands here — those payment rows have
             // received_by = null, so the cashier is never asked to account
             // for money the bank settled hands-free.
             const UPI_LIKE = new Set(["UPI", "RAZORPAY", "PHONEPE", "PAYTM", "STRIPE", "BANK_TRANSFER"])

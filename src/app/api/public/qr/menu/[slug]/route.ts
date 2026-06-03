@@ -22,7 +22,7 @@ import { resolveGateway } from "@/lib/payments/gateway"
  *      for up to 30 seconds without round-tripping to us at all. The
  *      slightly tighter window means menu edits propagate quickly.
  *
- * Tenant onboarding state (paytm_ready, stripe_ready) is computed
+ * Tenant onboarding state (phonepe_ready, stripe_ready) is computed
  * inside the cached function. That's fine — these flags flip rarely
  * (once per tenant during initial gateway onboarding) and a 60-second
  * stale window during that ramp is acceptable.
@@ -50,22 +50,15 @@ async function loadPublicMenu(slug: string, tableNumber: string | null) {
 
     const gateway = resolveGateway(t.country, t.payment_gateway)
 
-    let paytmReady = false
+    let phonepeReady = false
     let stripeReady = false
-    if (gateway === "paytm") {
-        const { data: gw } = await supabase
-            .from("tenant_payment_gateways")
-            .select("paytm_mid, paytm_merchant_key, paytm_enabled")
-            .eq("tenant_id", t.id)
-            .maybeSingle()
-        const r = gw as { paytm_mid?: string | null; paytm_merchant_key?: string | null; paytm_enabled?: boolean } | null
-        const tenantPaytm = Boolean(r?.paytm_enabled && r.paytm_mid && r.paytm_merchant_key)
-        // "Ready" when Paytm is connected per-tenant, OR via the platform
-        // .env fallback, OR — since the QR-ordering flow gracefully
-        // downgrades to plain UPI — when the restaurant has a UPI id.
-        paytmReady = tenantPaytm
-            || Boolean(process.env.PAYTM_MID && process.env.PAYTM_MERCHANT_KEY)
-            || Boolean(t.upi_id)
+    if (gateway === "phonepe") {
+        // PhonePe rail isn't built yet (Phase 2 of the gateway
+        // rework). For now we report "ready" whenever the tenant has
+        // a UPI id configured — the QR-ordering flow gracefully
+        // downgrades to plain manual UPI in that case so customers
+        // can still pay via screenshot.
+        phonepeReady = Boolean(t.upi_id)
     } else if (gateway === "stripe" && process.env.STRIPE_SECRET_KEY) {
         const { data: gw } = await supabase
             .from("tenant_payment_gateways")
@@ -127,7 +120,7 @@ async function loadPublicMenu(slug: string, tableNumber: string | null) {
             tenant: {
                 ...tenant,
                 payment_gateway: gateway,
-                paytm_ready: paytmReady,
+                phonepe_ready: phonepeReady,
                 stripe_ready: stripeReady,
             },
             categories: cats ?? [],

@@ -17,7 +17,7 @@ import { CelebrationFooter } from "../celebration-footer"
  * Page rhythm:
  *   Hero       — emotional anchor + concrete scope (9 steps, ~30 min)
  *   Outcomes   — what success looks like (live menu, GST-clean bills,
- *                Paytm collecting payments, CA Export ready)
+ *                PhonePe collecting payments, CA Export ready)
  *   Timeline   — 9 step cards on a vertical visual timeline. Tone
  *                cycles so adjacent steps stay distinguishable.
  *   Celebration— "ready to ring up your first order?" CTA
@@ -25,14 +25,14 @@ import { CelebrationFooter } from "../celebration-footer"
  *
  * India-specific picks vs the INTL guide:
  *   - Tax-IDs step includes GSTIN + FSSAI + PAN
- *   - Payment gateway step points at Paytm (UPI scan-to-pay)
+ *   - Payment gateway step points at PhonePe (UPI scan-to-pay)
  *   - Menu step calls out HSN codes + GST slabs
  *   - 9th step: CA Export (the differentiator for accountants)
  */
 const OUTCOMES_IN: Outcome[] = [
     { icon: ShoppingBag, title: "Menu is live", body: "Items, prices, GST slabs, HSN codes — all wired into POS + KDS.", tone: "primary" },
     { icon: Receipt, title: "GST-clean bills", body: "Every receipt prints with the right CGST/SGST split and your GSTIN.", tone: "magenta" },
-    { icon: Wallet, title: "Paytm collecting", body: "Customers scan a UPI QR and pay from any app — money settles straight to your own bank.", tone: "success" },
+    { icon: Wallet, title: "PhonePe collecting", body: "Customers scan a UPI QR and pay from any app — money settles straight to your own bank.", tone: "success" },
     { icon: FileSpreadsheet, title: "CA Export ready", body: "Month-end ZIP for your accountant — sales register, GSTR-1, P&L, the lot.", tone: "warning" },
 ]
 
@@ -130,11 +130,11 @@ export default function IndiaSetupGuidePage() {
                     icon={CreditCard}
                     tone="success"
                     estMinutes={4}
-                    title="Paytm UPI payments"
-                    body="Connect your own Paytm for Business account. Customers scan a UPI QR — on the POS customer screen or the table QR page — and pay from any UPI app (Google Pay, PhonePe, Paytm, BHIM). Money settles straight to your bank; the platform never touches it."
-                    tip="POS cash and plain UPI (no gateway) work the moment you finish step 4 — Paytm is only needed for automatic scan-to-pay confirmation."
-                    href="/settings/payments"
-                    cta="Connect Paytm"
+                    title="PhonePe UPI payments"
+                    body="Connect your own PhonePe Business account. Customers scan a UPI QR — on the POS customer screen or the table QR page — and pay from any UPI app (Google Pay, PhonePe, BHIM). Money settles straight to your bank; the platform never touches it."
+                    tip="There's a dedicated PhonePe setup walkthrough — sign up, KYC, Salt Key, sandbox test, go live — at /setup-guide/phonepe. Cash and plain UPI work without it; PhonePe is only needed for auto-confirmed scan-to-pay."
+                    href="/setup-guide/phonepe"
+                    cta="Open PhonePe guide"
                 />
 
                 <StepCard

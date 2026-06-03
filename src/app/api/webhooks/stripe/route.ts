@@ -379,7 +379,7 @@ async function dispatchStripeEvent(
     if (!billId && orderIdFromMeta) {
         // QR-ordering path. Confirm the order + auto-generate the bill,
         // then record the payment against the new bill. Same RPC the
-        // Paytm webhook uses for its QR-order handling.
+        // PhonePe webhook uses for its QR-order handling.
         const { data: order } = await supabase
             .from("orders")
             .select("id, awaiting_confirmation, tenant_id, table_id")

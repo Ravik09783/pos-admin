@@ -48,7 +48,7 @@ export default async function DashboardPage() {
             setup={{
                 hasMenu: (menuCount ?? 0) > 0,
                 hasTables: (tableCount ?? 0) > 0,
-                hasPayment: !!(t?.upi_id || t?.payment_gateway === "paytm"),
+                hasPayment: !!(t?.upi_id || t?.payment_gateway === "phonepe"),
                 menuCount: menuCount ?? 0,
                 tableCount: tableCount ?? 0,
             }}

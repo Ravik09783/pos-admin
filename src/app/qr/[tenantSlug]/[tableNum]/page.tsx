@@ -52,13 +52,13 @@ interface TenantLite {
     id: string; name: string; slug: string;
     upi_id: string | null; upi_payee_name: string | null;
     qr_ordering_enabled: boolean; qr_require_payment: boolean;
-    payment_gateway?: "manual" | "paytm" | "stripe";
-    /** True when the restaurant can take online payment on the "paytm"
-     *  gateway — Paytm is connected (per-tenant or the platform .env
+    payment_gateway?: "manual" | "phonepe" | "stripe";
+    /** True when the restaurant can take online payment on the "phonepe"
+     *  gateway — PhonePe is connected (per-tenant or the platform .env
      *  fallback) OR, since the flow downgrades gracefully, a plain UPI id
-     *  is set. When false on a "paytm" gateway, the page shows a "payment
+     *  is set. When false on a "phonepe" gateway, the page shows a "payment
      *  not set up" message and blocks ordering. */
-    paytm_ready?: boolean;
+    phonepe_ready?: boolean;
     /** Same idea for Stripe — true when platform Stripe key is set + the
      *  restaurant has a Stripe-connected account. Customer page redirects
      *  to Stripe Checkout when this is true; blocks with a "set up online
@@ -200,10 +200,10 @@ export default function QRMenuPage() {
     const [orderNumber, setOrderNumber] = useState<string | null>(null)
     const [billAmount, setBillAmount] = useState(0)
     const [upiQrUrl, setUpiQrUrl] = useState("")
-    // When set, the pay screen is a Paytm dynamic QR (auto-confirmed via
+    // When set, the pay screen is a PhonePe dynamic QR (auto-confirmed via
     // the webhook — no screenshot upload). Holds the UPI intent string so
     // we can also offer a one-tap "open UPI app" button.
-    const [paytmIntent, setPaytmIntent] = useState<string | null>(null)
+    const [phonepeIntent, setPhonePeIntent] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
     const [rejectReason, setRejectReason] = useState<string | null>(null)
     const [proofFile, setProofFile] = useState<File | null>(null)
@@ -560,7 +560,7 @@ export default function QRMenuPage() {
         setRejectReason(null)
         setProofFile(null)
         setUpiQrUrl("")
-        setPaytmIntent(null)
+        setPhonePeIntent(null)
         setCart([])
         removeCoupon()
         setStage("browse")
@@ -633,19 +633,30 @@ export default function QRMenuPage() {
             })
             writePersistedOrder(params.tenantSlug, params.tableNum, data.order_id)
 
-            // Paytm — show the dynamic UPI QR. The customer scans it from
-            // any UPI app; the Paytm webhook auto-confirms (no screenshot).
-            if (data.gateway === "paytm" && data.paytm?.qr_data) {
-                const qrPng = data.paytm.qr_image
-                    ? `data:image/png;base64,${data.paytm.qr_image}`
-                    : await QRCode.toDataURL(data.paytm.qr_data, {
-                        margin: 1, width: 360, color: { dark: "#0a0e1a", light: "#ffffff" },
-                    })
+            // PhonePe path — render the UPI intent QR. The webhook
+            // (or reconcile cron) flips the phonepe_payment_events row
+            // to SUCCESS, which runs confirm_qr_order_system on the
+            // server. The page's existing polling loop watches the order
+            // and advances to the success screen once the bill is minted.
+            if (data.gateway === "phonepe" && data.phonepe?.intent_uri) {
+                const intent = data.phonepe.intent_uri
+                setPhonePeIntent(intent)
+                // PhonePe's UPI_INTENT response always carries an intent
+                // URI we can rasterize ourselves. `qr_data` is sometimes
+                // populated with a base64 PNG too — when it is, prefer
+                // it (already styled by PhonePe); otherwise generate a
+                // QR from the intent so the customer always sees one.
+                const qrPng = (data.phonepe.qr_data && data.phonepe.qr_data.startsWith("data:"))
+                    ? data.phonepe.qr_data
+                    : await QRCode.toDataURL(intent, {
+                          margin: 1,
+                          width: 360,
+                          color: { dark: "#0a0e1a", light: "#ffffff" },
+                      })
                 setUpiQrUrl(qrPng)
-                setPaytmIntent(data.paytm.qr_data)
                 setStage("pay_manual")
                 setCartOpen(false)
-                setBusy(false); return
+                return
             }
 
             // Stripe path — redirect the customer to Stripe's hosted Checkout.
@@ -752,10 +763,10 @@ export default function QRMenuPage() {
     // Online-gateway required but the restaurant hasn't finished payment
     // setup. Block ordering entirely with a clear message — telling the
     // customer it's a config issue, not their fault. The menu API already
-    // resolved the country-correct gateway (Paytm for India, Stripe
+    // resolved the country-correct gateway (PhonePe for India, Stripe
     // elsewhere); we just check the matching readiness flag.
     const gatewayUnready =
-        (tenant.payment_gateway === "paytm"  && tenant.paytm_ready  === false) ||
+        (tenant.payment_gateway === "phonepe"  && tenant.phonepe_ready  === false) ||
         (tenant.payment_gateway === "stripe" && tenant.stripe_ready === false)
     if (menuLoadStatus === "ok" && stage === "browse" && gatewayUnready) {
         return (
@@ -949,11 +960,11 @@ export default function QRMenuPage() {
     }
 
     if (stage === "pay_manual") {
-        // Paytm flow: the QR is a Paytm dynamic QR — auto-confirmed by the
+        // PhonePe flow: the QR is a PhonePe dynamic QR — auto-confirmed by the
         // webhook, so no screenshot upload. A `upi:` intent also opens the
         // customer's own UPI app one-tap; anything else is QR-scan only.
-        const isPaytmPay = paytmIntent !== null
-        const upiDeepLink = isPaytmPay && /^upi:/i.test(paytmIntent ?? "") ? paytmIntent : null
+        const isPhonePePay = phonepeIntent !== null
+        const upiDeepLink = isPhonePePay && /^upi:/i.test(phonepeIntent ?? "") ? phonepeIntent : null
         return (
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -965,8 +976,8 @@ export default function QRMenuPage() {
                         <Sparkles className="h-7 w-7 text-primary mx-auto" />
                         <h2 className="text-2xl font-bold">Pay <span className="text-gradient">{money(billAmount)}</span></h2>
                         <p className="text-xs text-muted-foreground">
-                            {isPaytmPay
-                                ? "Scan with any UPI app — Google Pay, PhonePe, Paytm, BHIM. We confirm your payment automatically."
+                            {isPhonePePay
+                                ? "Scan with any UPI app — Google Pay, PhonePe, PhonePe, BHIM. We confirm your payment automatically."
                                 : "Scan with any UPI app, then upload your payment screenshot."}
                         </p>
                     </div>
@@ -981,7 +992,7 @@ export default function QRMenuPage() {
                             <img src={upiQrUrl} alt="UPI QR code" className="mx-auto" />
                         </motion.div>
                     )}
-                    {isPaytmPay ? (
+                    {isPhonePePay ? (
                         <div className="rounded-md bg-muted/40 p-3 text-sm space-y-2">
                             <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Table</span>
@@ -1027,7 +1038,7 @@ export default function QRMenuPage() {
                     </div>
                 )}
 
-                {isPaytmPay ? (
+                {isPhonePePay ? (
                     <div className="glass-strong rounded-2xl p-5 space-y-3">
                         {upiDeepLink && (
                             <Button asChild variant="neon" size="lg" className="w-full">
@@ -1148,7 +1159,7 @@ export default function QRMenuPage() {
                         <div className="font-bold text-lg leading-tight truncate text-gradient">{tenant.name}</div>
                         <div className="text-xs text-muted-foreground flex items-center gap-1">
                             <Badge variant="outline" className="text-[10px] py-0 px-1.5">Table {params.tableNum}</Badge>
-                            {tenant.payment_gateway === "paytm" && (
+                            {tenant.payment_gateway === "phonepe" && (
                                 <Badge variant="neon" className="text-[10px] py-0 px-1.5"><Zap className="h-2.5 w-2.5 mr-0.5" />Instant</Badge>
                             )}
                         </div>
@@ -1436,9 +1447,9 @@ export default function QRMenuPage() {
                                         {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
                                         Place order &amp; pay {money(grandTotal)}
                                     </Button>
-                                    {tenant.payment_gateway === "paytm" && (
+                                    {tenant.payment_gateway === "phonepe" && (
                                         <p className="text-[10px] text-center text-muted-foreground mt-2">
-                                            ⚡ Instant confirmation · UPI via Paytm
+                                            ⚡ Instant confirmation · UPI via PhonePe
                                         </p>
                                     )}
                                 </>

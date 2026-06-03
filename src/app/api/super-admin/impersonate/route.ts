@@ -114,12 +114,20 @@ export async function POST(req: Request) {
     }
 
     // ── Mint the magic link ────────────────────────────────────────────
+    // `redirectTo` deliberately lands on `/auth/impersonate-land` rather
+    // than `/dashboard` or `/menu`. The landing page sits OUTSIDE the
+    // `(app)` route group so the super-admin short-circuit in
+    // `(app)/layout.tsx` doesn't redirect the new tab away before
+    // `AuthHashHandler` has a chance to read the URL hash and swap
+    // the cookies. The path is also exempted in `proxy.ts` so no
+    // session refresh races the swap. After the swap, the handler
+    // forwards to `/menu` as the impersonated user.
     const appUrl = appOrigin(req)
     const { data, error } = await service.auth.admin.generateLink({
         type: "magiclink",
         email: targetEmail,
         options: {
-            redirectTo: `${appUrl}/dashboard?impersonated=1`,
+            redirectTo: `${appUrl}/auth/impersonate-land`,
         },
     })
     if (error) {
@@ -134,12 +142,37 @@ export async function POST(req: Request) {
         }, { status: 500 })
     }
 
-    logInfo("super-admin impersonation", {
-        superAdminEmail: guard.email,
-        tenantId,
-        userId,
-        targetEmail,
-    })
+    // Verbose debug log — captures the appUrl we asked Supabase to
+    // redirect to AND a sanitised view of the action_link Supabase
+    // actually returned, so a stuck "Signing you in…" can be traced
+    // to (a) whether the link points at our app or fell back to the
+    // project's Site URL, and (b) what `redirect_to` Supabase
+    // ultimately encoded into the link.
+    try {
+        const linkUrl = new URL(action_link)
+        const encodedRedirect = linkUrl.searchParams.get("redirect_to")
+        logInfo("[impersonate] mint OK", {
+            superAdminEmail: guard.email,
+            tenantId,
+            userId,
+            targetEmail,
+            requestedRedirectTo: `${appUrl}/auth/impersonate-land`,
+            actionLinkHost: linkUrl.host,
+            actionLinkPath: linkUrl.pathname,
+            actionLinkType: linkUrl.searchParams.get("type"),
+            actionLinkRedirectTo: encodedRedirect,
+            // True when Supabase honoured what we asked for; false
+            // means the requested URL was rejected by the project's
+            // redirect-URL allowlist and Supabase substituted the
+            // project's Site URL — almost always the cause of an
+            // impersonation that lands "somewhere weird".
+            redirectMatchesRequest: encodedRedirect === `${appUrl}/auth/impersonate-land`,
+        })
+    } catch {
+        logInfo("[impersonate] mint OK (action_link unparsable)", {
+            superAdminEmail: guard.email, tenantId, userId, targetEmail,
+        })
+    }
 
     return NextResponse.json({
         ok: true,

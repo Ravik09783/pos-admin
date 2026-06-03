@@ -51,7 +51,7 @@ export default function BillDetailPage() {
     // fraud loophole where a cashier could print a bill, take cash, and
     // never click "Record payment". generate_bill + record_payment now
     // fire together at checkout (see CheckoutPreviewDialog). Online
-    // top-ups still arrive via the Paytm/Stripe webhook.
+    // top-ups still arrive via the PhonePe/Stripe webhook.
     const [customer, setCustomer] = useState<{ id: string; name: string | null; loyalty_points: number } | null>(null)
     const [billedBy, setBilledBy] = useState<{ id: string; full_name: string | null; email: string | null; avatar_url: string | null; role: string } | null>(null)
 
@@ -147,7 +147,7 @@ export default function BillDetailPage() {
 
     /** Live status — subscribe to changes on THIS bill + its payments.
      *  When the cashier hits "Send payment link" and the customer pays
-     *  via Stripe/Paytm, the webhook updates the bill status server-
+     *  via Stripe/PhonePe, the webhook updates the bill status server-
      *  side. Without this sub, the cashier would have to manually
      *  refresh to see the bill flip from GENERATED to PAID. With it,
      *  the page updates in real time the moment the webhook lands. */
@@ -314,7 +314,7 @@ export default function BillDetailPage() {
                       * page is listening for the webhook. Disappears as
                       * soon as the bill flips to PAID via Realtime. */}
                     {bill.bill_status === "GENERATED" && (
-                        <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/40 border border-border/40 text-[11px] text-muted-foreground" title="Page auto-updates when Stripe / Paytm confirms payment.">
+                        <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/40 border border-border/40 text-[11px] text-muted-foreground" title="Page auto-updates when Stripe / PhonePe confirms payment.">
                             <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                             Listening for payment…
                         </div>

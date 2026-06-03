@@ -72,7 +72,7 @@ export const PLANS_IN: PlanDefinition[] = [
         features: [
             "1 outlet · 1 staff seat (owner)",
             ...COMMON_FEATURES,
-            "Paytm UPI payments — money straight to your bank",
+            "PhonePe UPI payments — money straight to your bank",
             "One-click CA Export (GSTR-1 + 3B + P&L + BS)",
             "Email support (48h)",
         ],
@@ -89,7 +89,7 @@ export const PLANS_IN: PlanDefinition[] = [
         features: [
             "3 outlets · 3 staff per outlet (9 seats)",
             ...COMMON_FEATURES,
-            "Paytm UPI payments — money straight to your bank",
+            "PhonePe UPI payments — money straight to your bank",
             "One-click CA Export (GSTR-1 + 3B + P&L + BS)",
             "Swiggy / Zomato channel tagging",
             "WhatsApp + SMS alerts",
@@ -108,7 +108,7 @@ export const PLANS_IN: PlanDefinition[] = [
         features: [
             "10 outlets · 3 staff per outlet (30 seats)",
             ...COMMON_FEATURES,
-            "Paytm UPI payments — money straight to your bank",
+            "PhonePe UPI payments — money straight to your bank",
             "One-click CA Export (GSTR-1 + 3B + P&L + BS)",
             "Multi-branch consolidated reports",
             "Priority WhatsApp + phone support",

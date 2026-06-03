@@ -4,7 +4,13 @@ import { appOrigin } from "@/lib/app-origin"
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { logError, logWarn } from "@/lib/errors"
 import { resolveGateway, type PaymentGateway } from "@/lib/payments/gateway"
-import { paytmCreateQr, paytmEnvCreds, resolveTenantPaytmCreds, type PaytmCreds, type TenantPaytmRow } from "@/lib/billing/paytm"
+import {
+    createPhonePePayment,
+    phonepeEnvCreds,
+    resolveTenantPhonePeCreds,
+    type PhonePeCreds,
+    type TenantPhonePeRow,
+} from "@/lib/billing/phonepe"
 import { getClientIp, rateLimit } from "@/lib/rate-limit"
 
 interface PlaceOrderBody {
@@ -28,10 +34,11 @@ interface PlaceOrderBody {
  *
  * Validates sold-out items and creates an order in awaiting_confirmation state.
  *
- * Returns either a Paytm dynamic-UPI-QR payload (recommended path — the
- * payment goes directly to the restaurant's Paytm account and the webhook
- * auto-confirms), a Stripe Checkout payload, or a manual UPI payload
- * (fallback when the owner hasn't connected an online gateway).
+ * Returns either a Stripe Checkout payload (outside India) or a manual
+ * UPI payload (fallback when no online gateway is connected). India
+ * defaults to PhonePe — the integration is being rebuilt in Phase 2;
+ * until then PhonePe-eligible orders downgrade to manual UPI so the
+ * customer can still pay via screenshot.
  */
 export async function POST(req: Request) {
     // ---- Rate limit by IP + table to prevent flooding ----
@@ -126,16 +133,17 @@ export async function POST(req: Request) {
     }
 
     // ---- Determine payment path ----
-    // Country drives the gateway: India → Paytm (UPI), elsewhere → Stripe
-    // (Connect). An Indian admin can opt into "manual" UPI; the resolver
-    // enforces that policy in one place (src/lib/payments/gateway.ts).
+    // Country drives the gateway: India → PhonePe (UPI), elsewhere →
+    // Stripe (Connect). An Indian admin can opt into "manual" UPI; the
+    // resolver enforces that policy in one place
+    // (src/lib/payments/gateway.ts).
     //
     // For an online gateway the restaurant must have completed onboarding:
-    //   - Paytm:  tenant_payment_gateways.paytm_enabled + MID + key
-    //             (or the platform .env fallback for dev / single-restaurant)
-    //   - Stripe: tenant_payment_gateways.stripe_connected_account_id (acct_*)
-    // When Paytm isn't connected we downgrade to manual UPI if the
-    // restaurant has a UPI id; otherwise this route refuses with 400.
+    //   - PhonePe: tenant_payment_gateways.phonepe_enabled + Merchant ID +
+    //              Salt Key (or the platform .env UAT fallback)
+    //   - Stripe:  tenant_payment_gateways.stripe_connected_account_id
+    // When PhonePe isn't connected we downgrade to manual UPI if the
+    // tenant has a UPI id; otherwise this route refuses with 400.
     const gateway = resolveGateway(t.country, t.payment_gateway)
 
     type StripeConnect = {
@@ -143,24 +151,21 @@ export async function POST(req: Request) {
         stripe_account_enabled: boolean | null
     }
     let stripeAcct: StripeConnect | null = null
-    let paytmCreds: PaytmCreds | null = null
+    let phonepeCreds: PhonePeCreds | null = null
     // The gateway we actually run this order through. Starts as the
-    // resolved gateway, then downgrades paytm → manual when Paytm isn't
-    // connected so a transient gap doesn't block ordering entirely.
+    // resolved gateway, then downgrades phonepe → manual when PhonePe
+    // isn't connected so a transient gap doesn't block ordering.
     let effectiveGateway: PaymentGateway = gateway
 
-    if (gateway === "paytm") {
+    if (gateway === "phonepe") {
         const { data: gw } = await supabase
             .from("tenant_payment_gateways")
-            .select("paytm_mid, paytm_merchant_key, paytm_mid_staging, paytm_merchant_key_staging, paytm_enabled, paytm_env")
+            .select("phonepe_mid, phonepe_merchant_key, phonepe_salt_index, phonepe_mid_staging, phonepe_merchant_key_staging, phonepe_salt_index_staging, phonepe_enabled, phonepe_env")
             .eq("tenant_id", t.id)
             .maybeSingle()
-        // Helper picks production vs staging credentials based on
-        // `paytm_env`. Falls back to the platform .env pair when the
-        // tenant doesn't have a connected Paytm.
-        paytmCreds =
-            resolveTenantPaytmCreds(gw as TenantPaytmRow | null) ?? paytmEnvCreds()
-        if (!paytmCreds) {
+        phonepeCreds =
+            resolveTenantPhonePeCreds(gw as TenantPhonePeRow | null) ?? phonepeEnvCreds()
+        if (!phonepeCreds) {
             if (!t.upi_id) {
                 return NextResponse.json({
                     error: "Restaurant has not finished setting up online payments. Please ask staff to take payment in person.",
@@ -364,68 +369,81 @@ export async function POST(req: Request) {
         coupon_discount: couponDiscount,
     }).eq("id", orderId)
 
-    // ===== Paytm path — dynamic UPI QR + webhook auto-confirm =====
-    // Issue a Paytm dynamic QR for the exact amount. The customer scans it
-    // from ANY UPI app; on success Paytm POSTs to /api/webhooks/paytm,
-    // which confirms the order + generates the bill. The QR is tracked in
-    // paytm_payment_events so the webhook can map the payment back here.
-    if (effectiveGateway === "paytm" && paytmCreds) {
-        const qr = await paytmCreateQr(paytmCreds, {
-            orderId,                 // the order UUID — unique, echoed by the webhook
-            amount: grandTotal,
-            posId: t.id,
-        })
-        if (!qr.ok || !qr.data?.qrData) {
-            logError(new Error(`Paytm QR create failed: ${qr.message}`), {
-                route: "/api/public/qr/place-order", tenantId: t.id, orderId,
+    // ===== PhonePe path =====
+    // Mint a PhonePe transaction with instrument=UPI_INTENT — that yields
+    // a `intentUrl` (deep-link / QR data) the customer can scan in any
+    // UPI app. The downstream webhook (`/api/webhooks/phonepe`) flips
+    // the PENDING `phonepe_payment_events` row to SUCCESS and calls
+    // `confirm_qr_order_system` which finalises the bill.
+    if (effectiveGateway === "phonepe" && phonepeCreds) {
+        const merchantTxnId = `qr-${orderId.slice(0, 8)}-${Date.now().toString(36)}`
+
+        // Insert the PENDING event FIRST so the webhook + reconcile cron
+        // have a row to match against. PRIMARY KEY on
+        // merchant_transaction_id makes this safe to retry.
+        const { error: eventErr } = await supabase
+            .from("phonepe_payment_events")
+            .insert({
+                merchant_transaction_id: merchantTxnId,
+                tenant_id: t.id,
+                order_id: orderId,
+                amount: grandTotal,
+                currency: t.currency ?? "INR",
+                flow: "QR_ORDER",
+                status: "PENDING",
+            } as never)
+        if (eventErr) {
+            logError(eventErr, {
+                route: "/api/public/qr/place-order",
+                tenantId: t.id,
+                orderId,
+                stage: "phonepe_event_insert",
             })
-            // Fall back to plain UPI when we can — better than blocking the
-            // customer entirely on a transient Paytm hiccup.
-            if (t.upi_id) {
-                await supabase.from("orders").update({ payment_gateway: "manual" }).eq("id", orderId)
-                return NextResponse.json({
-                    ok: true,
-                    gateway: "manual",
-                    order_id: orderId,
-                    order_number: orderNumber,
-                    amount: grandTotal,
-                    coupon_discount: couponDiscount,
-                    manual: {
-                        upi_id: t.upi_id,
-                        upi_payee_name: t.upi_payee_name ?? t.name,
-                    },
-                })
-            }
-            return NextResponse.json({
-                error: "Couldn't start the payment just now. Please ask a staff member for help.",
-            }, { status: 502 })
+            return NextResponse.json({ error: "Couldn't start PhonePe payment. Try again." }, { status: 500 })
         }
 
-        // Track the QR — paytm_order_id == the order UUID we sent to Paytm.
-        // The webhook finds this row by ORDERID and is idempotent on it.
-        await supabase.from("paytm_payment_events").insert({
-            paytm_order_id: orderId,
-            tenant_id: t.id,
-            order_id: orderId,
+        const appUrl = appOrigin(req)
+        const result = await createPhonePePayment(phonepeCreds, {
+            merchantTransactionId: merchantTxnId,
+            // No signed-in user for QR ordering — use the orderId so
+            // PhonePe + our reconciliation can correlate by it.
+            merchantUserId: orderId,
             amount: grandTotal,
-            currency: "INR",
-            flow: "QR_ORDER",
-            status: "PENDING",
-        } as never)
+            instrument: "UPI_INTENT",
+            // Customer redirected back to the QR page; the page polls
+            // /api/public/qr/order-status and shows the success screen
+            // once the webhook (or reconcile cron) lands.
+            redirectUrl: `${appUrl}/qr/${body.tenant_slug}/${body.table_number}?paid=${orderId}`,
+            callbackUrl: `${appUrl}/api/webhooks/phonepe`,
+        })
+
+        if (!result.ok) {
+            // Mark the row FAILED so a retry can mint a fresh one.
+            await supabase
+                .from("phonepe_payment_events")
+                .update({ status: "FAILED", raw: result.raw ?? null, processed_at: new Date().toISOString() } as never)
+                .eq("merchant_transaction_id", merchantTxnId)
+            logError(`createPhonePePayment failed: ${result.message}`, {
+                route: "/api/public/qr/place-order",
+                tenantId: t.id,
+                orderId,
+                merchantTxnId,
+            })
+            return NextResponse.json({ error: result.message || "PhonePe rejected the payment" }, { status: 502 })
+        }
 
         return NextResponse.json({
             ok: true,
-            gateway: "paytm",
+            gateway: "phonepe",
             order_id: orderId,
             order_number: orderNumber,
             amount: grandTotal,
             coupon_discount: couponDiscount,
-            paytm: {
-                // UPI intent string — the customer page renders it as a QR
-                // (and as a "pay now" deep link when it's a upi:// intent).
-                qr_data: qr.data.qrData,
-                // Optional Paytm-rendered QR image (base64 PNG).
-                qr_image: qr.data.image ?? null,
+            phonepe: {
+                merchant_transaction_id: merchantTxnId,
+                intent_uri: result.intentUri ?? null,
+                qr_data: result.qrData ?? result.intentUri ?? null,
+                redirect_url: result.redirectUrl ?? null,
             },
         })
     }

@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation"
-import Link from "next/link"
-import { ArrowLeft, ShieldAlert } from "lucide-react"
+import { ShieldAlert } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/app-shell/theme-toggle"
 import { createClient } from "@/lib/supabase/server"
 import { isSuperAdminFromAuth, superAdminFeatureConfigured } from "@/lib/super-admin/auth"
+
+import { SuperAdminUserMenu } from "./user-menu"
 
 /**
  * Route gate for the entire `/super-admin/*` tree.
@@ -56,11 +56,12 @@ export default async function SuperAdminLayout({ children }: { children: React.R
                     </div>
                     <div className="ml-auto flex items-center gap-2">
                         <ThemeToggle />
-                        <Button asChild variant="outline" size="sm">
-                            <Link href="/dashboard">
-                                <ArrowLeft className="h-4 w-4" /> Back to my dashboard
-                            </Link>
-                        </Button>
+                        {/* Avatar-style dropdown with "Back to my
+                          * dashboard", "My profile", and Sign out.
+                          * Previously this slot was just a back-link
+                          * button — a super-admin had no in-app way
+                          * to drop their session. */}
+                        <SuperAdminUserMenu email={user.email ?? ""} />
                     </div>
                 </div>
             </header>

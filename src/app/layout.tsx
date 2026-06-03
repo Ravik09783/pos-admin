@@ -6,6 +6,7 @@ import "./globals.css"
 
 import { Providers } from "@/lib/providers"
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/site"
+import { AuthHashHandler } from "@/components/auth-hash-handler"
 import { ServiceWorkerRegistrar } from "@/components/app-shell/sw-register"
 import { RouteProgress } from "@/components/app-shell/route-progress"
 import { FestivalAmbient } from "@/components/app-shell/festival-ambient"
@@ -72,23 +73,53 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-    themeColor: "#0a0e1a",
+    // Browser chrome (mobile address bar tint) — matches the default
+    // theme's canvas so the bar blends into the page rather than
+    // popping a contrasting strip on first paint.
+    themeColor: "#faf8f2",
     width: "device-width",
     initialScale: 1,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
-        <html lang="en" className="dark" data-theme="neon" suppressHydrationWarning>
+        // SSR defaults match the catalog default (Atelier — light mode)
+        // so first paint already shows the right theme even before the
+        // inline script swaps it for a user's saved pick. Without this
+        // a default visitor briefly saw the old neon-dark canvas.
+        // `suppressHydrationWarning` lets the inline script mutate
+        // these attributes client-side without React complaining; same
+        // attribute is also set on the body to silence the extra
+        // `bis_register` attribute injected by Bitdefender / similar
+        // password-manager browser extensions.
+        <html lang="en" className="light" data-theme="atelier" suppressHydrationWarning>
             <head>
                 {/* Apply the saved theme BEFORE React hydrates, so users who
-                 *  picked a non-default theme don't see a flash of the default. */}
-                <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+                 *  picked a non-default theme don't see a flash of the default.
+                 *  `suppressHydrationWarning` is REQUIRED here because some
+                 *  browser extensions (BIS, ad-blockers) rewrite inline
+                 *  <script> contents at runtime — without it React fires a
+                 *  hydration mismatch on the script's text. */}
+                <script
+                    suppressHydrationWarning
+                    dangerouslySetInnerHTML={{ __html: themeInitScript }}
+                />
             </head>
-            <body className={`${dmSans.variable} ${lora.variable} ${geistMono.variable}`}>
+            <body
+                suppressHydrationWarning
+                className={`${dmSans.variable} ${lora.variable} ${geistMono.variable}`}
+            >
                 <ThemeProvider>
                     <Providers>
                         <Suspense fallback={null}><RouteProgress /></Suspense>
+                        {/* Catches Supabase auth tokens delivered in
+                          * the URL hash (#access_token=…&refresh_token=…)
+                          * and exchanges them for a real session. Mounted
+                          * at the root so it works on EVERY page —
+                          * critical for super-admin impersonation magic
+                          * links, which can land anywhere depending on
+                          * the Supabase project's redirect-URL allowlist. */}
+                        <AuthHashHandler />
                         {children}
                         {/* Festive ambient emoji rain when the user picks a
                          *  festival theme. Renders nothing for non-festival

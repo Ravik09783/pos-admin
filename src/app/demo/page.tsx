@@ -32,7 +32,7 @@ const POINTS = [
     "POS billing on any tablet, phone or laptop",
     "Realtime kitchen display (KDS) and KOTs",
     "QR table ordering — guests scan, pay, order",
-    "Paytm UPI Direct — money lands in your bank",
+    "PhonePe UPI Direct — money lands in your bank",
     "CA-ready GST exports (India): GSTR-1, GSTR-3B, Tally",
     "Loyalty, gift cards, coupons & customer CRM",
 ]

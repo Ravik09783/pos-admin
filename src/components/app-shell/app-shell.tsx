@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { ImpersonationBanner } from "@/components/impersonation-banner"
 import { AppFooter } from "./app-footer"
 import { BillingBanner } from "./billing-banner"
 import { CommandPalette } from "./command-palette"
@@ -77,6 +78,10 @@ export function AppShell(props: AppShellProps) {
     if (isKiosk) {
         return (
             <div className="min-h-screen bg-background relative">
+                {/* Impersonation banner — pins to the top even in kiosk
+                  * mode so a super-admin who jumped into POS/KDS can
+                  * still return to their own account in one click. */}
+                <ImpersonationBanner />
                 {/* Page content — full bleed, no chrome */}
                 <main className="min-h-screen">{props.children}</main>
 
@@ -123,6 +128,10 @@ export function AppShell(props: AppShellProps) {
     // bottom of `<main>` doesn't get clipped on mobile.
     return (
         <div className="h-dvh flex flex-col">
+            {/* Impersonation banner — sits above the topbar so the
+              * "Return to my account" affordance is the first thing a
+              * super-admin sees when they're inside another tenant. */}
+            <ImpersonationBanner />
             <Topbar
                 tenantId={props.tenantId}
                 tenantName={props.tenantName}

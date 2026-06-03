@@ -131,7 +131,7 @@ export function PaymentLinkDialog({
                             Open Stripe Checkout (international cards)
                         </Button>
                         <p className="text-xs text-muted-foreground pt-2">
-                            For UPI payments, the customer scans the Paytm QR on the POS customer screen.
+                            For UPI payments, the customer scans the PhonePe QR on the POS customer screen.
                             Once they pay, our webhook marks the bill paid automatically.
                         </p>
                     </TabsContent>

@@ -478,7 +478,7 @@ function ColorRow({
 }
 
 // --------------------------------------------------------------------------
-// HTML card — Paytm-shop-style portrait card. Brand gradient header,
+// HTML card — PhonePe-shop-style portrait card. Brand gradient header,
 // table number badge, big QR with quote underneath, numbered steps,
 // footer with the public URL. Look is driven by `settings`.
 // --------------------------------------------------------------------------

@@ -94,9 +94,9 @@ interface PaymentConfig {
 /** Non-secret gateway config from `tenant_payment_gateways` (the merchant
  *  key / secrets are deliberately never selected). */
 interface GatewayConfig {
-    paytm_mid: string | null
-    paytm_enabled: boolean | null
-    paytm_env: string | null
+    phonepe_mid: string | null
+    phonepe_enabled: boolean | null
+    phonepe_env: string | null
     stripe_connected_account_id: string | null
     stripe_account_enabled: boolean | null
     stripe_charges_enabled: boolean | null
@@ -111,7 +111,7 @@ const METHOD_LABELS: Record<string, string> = {
     CARD: "Card",
     RAZORPAY: "Razorpay",
     PHONEPE: "PhonePe",
-    PAYTM: "Paytm",
+    PAYTM: "PhonePe",
     STRIPE: "Stripe",
     BANK_TRANSFER: "Bank transfer",
     CREDIT: "Credit",
@@ -151,7 +151,7 @@ export default async function SuperAdminTenantDetailPage({
             .maybeSingle(),
         service
             .from("tenant_payment_gateways")
-            .select("paytm_mid, paytm_enabled, paytm_env, stripe_connected_account_id, stripe_account_enabled, stripe_charges_enabled, stripe_payouts_enabled, stripe_account_country")
+            .select("phonepe_mid, phonepe_enabled, phonepe_env, stripe_connected_account_id, stripe_account_enabled, stripe_charges_enabled, stripe_payouts_enabled, stripe_account_country")
             .eq("tenant_id", id)
             .maybeSingle(),
     ])
@@ -611,7 +611,7 @@ function PayStat({ label, value, sub }: { label: string; value: string; sub: str
 
 /**
  * Payment setup the restaurant configured — its UPI ID (with a scannable
- * QR generated from it), the online gateway it picked (Paytm / Stripe /
+ * QR generated from it), the online gateway it picked (PhonePe / Stripe /
  * manual), and the QR-ordering switches. Secrets (merchant key, Stripe
  * keys) are never fetched, so nothing sensitive is shown.
  */
@@ -674,14 +674,14 @@ function PaymentSetupCard({
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Online payment gateway
                     </h3>
-                    {gw === "paytm" ? (
+                    {gw === "phonepe" ? (
                         <div className="grid grid-cols-2 gap-2 text-xs">
-                            <SmallStat label="Gateway" value="Paytm" />
-                            <SmallStat label="Status" value={gateway?.paytm_enabled ? "Enabled" : "Not enabled"} />
-                            <SmallStat label="Merchant ID" value={gateway?.paytm_mid || "—"} mono />
+                            <SmallStat label="Gateway" value="PhonePe" />
+                            <SmallStat label="Status" value={gateway?.phonepe_enabled ? "Enabled" : "Not enabled"} />
+                            <SmallStat label="Merchant ID" value={gateway?.phonepe_mid || "—"} mono />
                             <SmallStat
                                 label="Environment"
-                                value={gateway?.paytm_env === "production" ? "Production" : "Staging"}
+                                value={gateway?.phonepe_env === "production" ? "Production" : "Staging"}
                             />
                         </div>
                     ) : gw === "stripe" ? (

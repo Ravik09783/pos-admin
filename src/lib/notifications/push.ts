@@ -1,6 +1,6 @@
 /**
  * Server-side Web Push helper. Used by:
- *   - Paytm webhook (TXN_SUCCESS for QR orders)
+ *   - PhonePe webhook (TXN_SUCCESS for QR orders)
  *   - Stripe webhook (payment_intent.succeeded for QR orders)
  *   - Test endpoint (/api/notifications/push/test)
  *

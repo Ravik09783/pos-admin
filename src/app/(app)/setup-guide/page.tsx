@@ -6,7 +6,7 @@ import { getTaxConfig } from "@/lib/tax/locale-config"
 /**
  * `/setup-guide` — country router. Reads the calling tenant's
  * `country` and forwards to the matching guide. Indian tenants land
- * on the GST + Paytm path; everyone else lands on the Stripe
+ * on the GST + PhonePe path; everyone else lands on the Stripe
  * Connect path. The two guide pages themselves remain directly
  * addressable (`/setup-guide/india`, `/setup-guide/international`)
  * for support links, screenshots, and the "I want to see the other

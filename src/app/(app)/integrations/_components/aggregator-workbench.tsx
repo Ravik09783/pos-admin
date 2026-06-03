@@ -207,39 +207,67 @@ export function AggregatorWorkbench({
         }
     }
 
+    // Layout strategy:
+    //   • NOT_CONNECTED: lead with the integration guide so a first-time
+    //     admin sees what to do; KPI strip + workbench sit below but
+    //     would be empty anyway. Settings card surfaced too so they can
+    //     mark it MANUAL_TRACKING the moment they tag their first order.
+    //   • Connected (MANUAL_TRACKING / CONNECTED): lead with KPIs +
+    //     orders + settlements (the daily-use surface). Settings + guide
+    //     drop to the bottom — out of the way until needed.
+    const notConnected = (integration?.status ?? "NOT_CONNECTED") === "NOT_CONNECTED"
+
     return (
         <div className="container mx-auto py-6 md:py-8 px-4 max-w-6xl space-y-6">
             <Header meta={meta} integration={integration} />
 
-            <KpiStrip kpi={kpi} money={money} loading={loading} />
+            {notConnected ? (
+                <>
+                    <FirstStepsBanner meta={meta} />
+                    <GuideCard meta={meta} open={true} onToggle={() => setGuideOpen((v) => !v)} alwaysOpen />
+                    <SettingsCard
+                        meta={meta}
+                        status={status} setStatus={setStatus}
+                        partnerId={partnerId} setPartnerId={setPartnerId}
+                        contactEmail={contactEmail} setContactEmail={setContactEmail}
+                        commissionPct={commissionPct} setCommissionPct={setCommissionPct}
+                        notes={notes} setNotes={setNotes}
+                        busy={settingsBusy} onSave={saveSettings}
+                    />
+                </>
+            ) : (
+                <>
+                    <KpiStrip kpi={kpi} money={money} loading={loading} />
 
-            <SettingsCard
-                meta={meta}
-                status={status} setStatus={setStatus}
-                partnerId={partnerId} setPartnerId={setPartnerId}
-                contactEmail={contactEmail} setContactEmail={setContactEmail}
-                commissionPct={commissionPct} setCommissionPct={setCommissionPct}
-                notes={notes} setNotes={setNotes}
-                busy={settingsBusy} onSave={saveSettings}
-            />
+                    <OrdersCard
+                        meta={meta}
+                        orders={orders}
+                        loading={loading}
+                        money={money}
+                    />
 
-            <OrdersCard
-                meta={meta}
-                orders={orders}
-                loading={loading}
-                money={money}
-            />
+                    <SettlementsCard
+                        meta={meta}
+                        settlements={settlements}
+                        kpi={kpi}
+                        money={money}
+                        onAdd={() => setSettleOpen(true)}
+                        onDeleted={refresh}
+                    />
 
-            <SettlementsCard
-                meta={meta}
-                settlements={settlements}
-                kpi={kpi}
-                money={money}
-                onAdd={() => setSettleOpen(true)}
-                onDeleted={refresh}
-            />
+                    <SettingsCard
+                        meta={meta}
+                        status={status} setStatus={setStatus}
+                        partnerId={partnerId} setPartnerId={setPartnerId}
+                        contactEmail={contactEmail} setContactEmail={setContactEmail}
+                        commissionPct={commissionPct} setCommissionPct={setCommissionPct}
+                        notes={notes} setNotes={setNotes}
+                        busy={settingsBusy} onSave={saveSettings}
+                    />
 
-            <GuideCard meta={meta} open={guideOpen} onToggle={() => setGuideOpen((v) => !v)} />
+                    <GuideCard meta={meta} open={guideOpen} onToggle={() => setGuideOpen((v) => !v)} />
+                </>
+            )}
 
             <AddSettlementDialog
                 open={settleOpen}
@@ -248,6 +276,30 @@ export function AggregatorWorkbench({
                 onSaved={refresh}
             />
         </div>
+    )
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// First-steps banner — shown above the guide when status=NOT_CONNECTED.
+// Quick "you can start today" framing so the admin doesn't bounce.
+// ──────────────────────────────────────────────────────────────────────────
+function FirstStepsBanner({ meta }: { meta: AggregatorMeta }) {
+    return (
+        <Card className="border-primary/30 bg-primary/[0.04]">
+            <CardContent className="p-5">
+                <div className="flex items-start gap-4">
+                    <span className="grid place-items-center h-10 w-10 rounded-xl bg-primary text-primary-foreground shrink-0">
+                        <Sparkles className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                        <h2 className="font-bold text-base">You can start tracking {meta.label} orders today.</h2>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                            No approval needed. Just tag orders at the POS — the dashboard, commission projections and payout reconciliation all light up from those tags. Follow the three steps below to go live.
+                        </p>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
     )
 }
 
@@ -803,56 +855,83 @@ function AddSettlementDialog({
 // ──────────────────────────────────────────────────────────────────────────
 // Integration guide — collapsible, mirrors the WhatsApp guide pattern
 // ──────────────────────────────────────────────────────────────────────────
-function GuideCard({ meta, open, onToggle }: { meta: AggregatorMeta; open: boolean; onToggle: () => void }) {
+function GuideCard({
+    meta, open, onToggle, alwaysOpen = false,
+}: {
+    meta: AggregatorMeta
+    open: boolean
+    onToggle: () => void
+    alwaysOpen?: boolean
+}) {
+    const showBody = alwaysOpen || open
     return (
         <Card>
             <CardHeader>
-                <button onClick={onToggle} className="w-full text-left flex items-start justify-between gap-3">
+                {alwaysOpen ? (
                     <div>
                         <CardTitle className="text-base flex items-center gap-2">
-                            <Sparkles className="h-4 w-4 text-warning" /> How to integrate with {meta.label}
+                            <Sparkles className="h-4 w-4 text-warning" /> Step-by-step: get {meta.label} live
                         </CardTitle>
                         <CardDescription>
-                            Three paths: official partner program, third-party bridge, or manual tagging today. All
-                            three feed into the same workbench above.
+                            Three short steps. You can finish step 1 in the next 60 seconds — no aggregator approval needed.
                         </CardDescription>
                     </div>
-                    <ChevronDown className={cn("h-5 w-5 transition-transform shrink-0", open && "rotate-180")} />
-                </button>
+                ) : (
+                    <button onClick={onToggle} className="w-full text-left flex items-start justify-between gap-3">
+                        <div>
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Sparkles className="h-4 w-4 text-warning" /> Setup guide
+                            </CardTitle>
+                            <CardDescription>
+                                Want to upgrade from manual tagging to live API sync? Open this for the path.
+                            </CardDescription>
+                        </div>
+                        <ChevronDown className={cn("h-5 w-5 transition-transform shrink-0", open && "rotate-180")} />
+                    </button>
+                )}
             </CardHeader>
-            {open && (
+            {showBody && (
                 <CardContent className="space-y-5">
                     <Path
                         n={1}
-                        title="Apply to the official partner program"
-                        timeline="7–30 days for listing · longer for direct POS integration"
+                        title={`Start tagging POS orders as ${meta.label} today`}
+                        timeline="60 seconds · no approval needed"
                         body={
                             <>
-                                Go to{" "}
-                                <a href={meta.partnerProgramUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
-                                    {meta.partnerProgramUrl.replace(/^https?:\/\//, "")}
-                                    <ExternalLink className="h-2.5 w-2.5" />
-                                </a>
-                                . Fill in the business application (FSSAI license, GST, bank account, owner KYC).
-                                Once approved you can list your menu via the {meta.label} partner portal — orders
-                                come in over their app, you can already track them <em>manually</em> here by
-                                tagging each order&apos;s Source on the POS.
+                                On the POS, when you ring up an order that came in via {meta.label}, open the
+                                checkout dialog and pick <strong>Source: {meta.label}</strong> before generating
+                                the bill. That&apos;s all. The workbench above lights up with that order, and the
+                                commission + payout math runs from those tags. Tip: once you&apos;ve tagged your
+                                first order, flip the status above to <em>Manual tracking</em>.
                             </>
                         }
-                        cta={{ href: meta.partnerProgramUrl, label: `Apply on ${meta.label}` }}
                     />
 
                     <Path
                         n={2}
-                        title="Wire up automatically via a third-party bridge"
+                        title={`(Optional) Apply to the official ${meta.label} partner program`}
+                        timeline="7–30 days for marketplace listing · 60–120 days for full POS integration"
+                        body={
+                            <>
+                                If you&apos;re not already a {meta.label} partner, sign up at the partner portal.
+                                You&apos;ll need FSSAI, GST, bank account and owner KYC. Once approved, customers
+                                can order via {meta.label} app — those orders still get tagged manually here, but
+                                the {meta.label} payout reports become your source of truth for settlements.
+                            </>
+                        }
+                        cta={{ href: meta.partnerProgramUrl, label: `Open ${meta.label} partner portal` }}
+                    />
+
+                    <Path
+                        n={3}
+                        title="(Optional) Go fully automatic via a bridge service"
                         timeline="Live the same day after the bridge approves you"
                         body={
                             <>
-                                {meta.label} doesn&apos;t publish a self-serve API key — but partners like
-                                UrbanPiper, Petpooja Bridge and MagicPin Reach DO, because they have their own
-                                approved integrations with the aggregators. You pay a small monthly fee per outlet
-                                and get auto-sync (orders push into your KDS, menu changes push back to{" "}
-                                {meta.label}, payouts auto-reconcile).
+                                Bridge services already hold the {meta.label} POS-integration agreement — you pay
+                                ~₹1500–3000/outlet/month and you stop tagging orders by hand. Orders push straight
+                                into your KDS, menu changes sync back to {meta.label}, payouts auto-reconcile.
+                                Most multi-outlet brands in India go this route. Pick one below.
                             </>
                         }
                         sub={
@@ -869,29 +948,14 @@ function GuideCard({ meta, open, onToggle }: { meta: AggregatorMeta; open: boole
                         }
                     />
 
-                    <Path
-                        n={3}
-                        title="Tag manually at the POS (works today)"
-                        timeline="No application needed — every restaurant can do this from day one."
-                        body={
-                            <>
-                                On the POS, before generating the bill, set <strong>Source: {meta.label}</strong> on
-                                the order. The workbench above (KPIs, recent orders, expected commission) populates
-                                from those tags. Then when {meta.label} sends the fortnightly payout statement,
-                                click <em>Add settlement</em> and copy in the numbers — the variance flag tells you
-                                immediately whether the commission they charged matches your contract.
-                            </>
-                        }
-                    />
-
                     <div className="rounded-md bg-primary/[0.05] border border-primary/30 p-3 text-xs space-y-1">
-                        <div className="font-semibold text-primary">When the {meta.label} integration goes live</div>
+                        <div className="font-semibold text-primary">What you get either way</div>
                         <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
-                            <li>Orders flow into the KDS automatically with the same urgency colour-coding as dine-in.</li>
-                            <li>Menu items + prices + sold-out flags sync both ways — toggle availability here, it propagates.</li>
-                            <li>Settlements are pulled nightly and auto-reconciled against the system gross.</li>
-                            <li>Cancellation reasons + delivery agent metadata land on the bill for audit.</li>
-                            <li>Per-aggregator P&amp;L sits in your monthly reports without manual tagging.</li>
+                            <li>One unified bills + sales report covering direct sales AND {meta.label}.</li>
+                            <li>Per-channel gross, order count and average order value at a glance.</li>
+                            <li>Commission projection so you can spot when {meta.label} overcharges.</li>
+                            <li>Payout-by-payout settlement log with automatic variance flagging.</li>
+                            <li>GST-clean bills regardless of source — Source: {meta.label} is recorded on each bill.</li>
                         </ul>
                     </div>
                 </CardContent>

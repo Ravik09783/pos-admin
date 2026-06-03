@@ -18,7 +18,7 @@
  * call sites.
  *
  * Usage:
- *   logError(err, { route: "/api/webhooks/paytm", tenantId, eventId })
+ *   logError(err, { route: "/api/webhooks/phonepe", tenantId, eventId })
  */
 
 export interface LogContext {

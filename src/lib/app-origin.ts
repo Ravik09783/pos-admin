@@ -2,24 +2,24 @@
  * Resolve the absolute origin to use when minting URLs that the caller
  * (or another browser they own) will open shortly afterwards.
  *
- * The rule:
- *   1. **Request origin wins.** If we have a `Request`, its origin is
- *      the URL the browser actually used to hit us — so when the user
- *      is on `localhost:3000`, the URLs we hand back are localhost
- *      URLs; when they're on production, the URLs are production. This
- *      is the right behaviour 99 % of the time.
- *   2. **`NEXT_PUBLIC_APP_URL` is a fallback,** only used when there's
- *      no request context (background jobs, scheduled tasks, places
- *      that don't have a `Request` to inspect).
- *   3. **`http://localhost:3000` is the floor** so a misconfigured
- *      dev env still produces *something* clickable instead of `undefined/...`.
+ * Resolution order, most-trustworthy first:
+ *   1. **Forwarded headers.** `x-forwarded-host` + `x-forwarded-proto`
+ *      reflect the exact URL the browser actually hit, even when our
+ *      Next.js server is behind a proxy (Vercel, fly.io, nginx). When
+ *      these are set we trust them above anything else — so a request
+ *      that came in on `https://staging.foo.com` produces a staging
+ *      URL, even though the internal `req.url` might read
+ *      `http://localhost:3000` on the platform's inner network.
+ *   2. **Request origin.** If no forwarded headers, derive from
+ *      `new URL(req.url).origin` — works for direct dev requests.
+ *   3. **`NEXT_PUBLIC_APP_URL`.** Background-job / cron / no-request
+ *      fallback only.
+ *   4. **`http://localhost:3000`.** Last-ditch sentinel so a totally
+ *      mis-configured dev env still produces a clickable URL.
  *
- * This is the inverse of what the codebase used to do (env-first,
- * request-fallback). The old order caused the "I'm running locally but
- * Open Customer Screen points at production" bug — staff on dev with a
- * production `NEXT_PUBLIC_APP_URL` would get a production URL from
- * every API that built one. Flipping the precedence kills that bug
- * everywhere in one place.
+ * Used by impersonation magic links, customer-display invitations,
+ * webhooks-with-action-URL, etc. — anything that round-trips a URL
+ * back to the user's browser.
  *
  * Trailing slashes are stripped so callers can safely do `${origin}/foo`.
  *
@@ -29,6 +29,17 @@
  */
 export function appOrigin(req?: Request | null): string {
     if (req) {
+        // 1) Forwarded headers (most reliable behind any proxy).
+        const fwdHost = req.headers.get("x-forwarded-host")
+        const fwdProto = req.headers.get("x-forwarded-proto") || "https"
+        if (fwdHost) {
+            // `x-forwarded-host` can be a comma-separated list when
+            // multiple proxies chain — the first entry is the one the
+            // browser actually used.
+            const host = fwdHost.split(",")[0]!.trim()
+            return `${fwdProto.split(",")[0]!.trim()}://${host}`.replace(/\/$/, "")
+        }
+        // 2) Plain `req.url` origin — fine for direct local dev hits.
         try {
             const fromReq = new URL(req.url).origin
             if (fromReq) return fromReq.replace(/\/$/, "")
@@ -36,7 +47,9 @@ export function appOrigin(req?: Request | null): string {
             /* malformed req.url — fall through to env */
         }
     }
+    // 3) Env-only fallback (cron / scheduled jobs / no request).
     const env = process.env.NEXT_PUBLIC_APP_URL
     if (env && env.trim()) return env.trim().replace(/\/$/, "")
+    // 4) Last-ditch sentinel.
     return "http://localhost:3000"
 }

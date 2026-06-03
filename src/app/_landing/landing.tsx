@@ -320,12 +320,12 @@ export function Features() {
         { icon: Lock, title: "Bill Lock Security", desc: "Once a bill is generated, only the Owner can edit. Every change goes to an immutable audit log." },
         { icon: ChefHat, title: "Realtime Kitchen Display", desc: "Orders fly to the kitchen via WebSockets. Color-coded urgency. Multi-station routing." },
         { icon: Wallet, title: "Country-aware Tax Engine", desc: "GST, VAT or sales tax — computed per item, rounded correctly, inter-state / inter-region aware. Pick your country; we ship the rates (India, US states, EU, Gulf & more)." },
-        { icon: Receipt, title: "QR Table Ordering", desc: "Guests scan, browse, pay online — UPI via Paytm or card — order auto-flows to your KDS. No app install, prices in your currency." },
+        { icon: Receipt, title: "QR Table Ordering", desc: "Guests scan, browse, pay online — UPI via PhonePe or card — order auto-flows to your KDS. No app install, prices in your currency." },
         { icon: Brain, title: "AI-style Insights", desc: "Anomaly detection, demand forecasting, customer win-back signals — all driven by your own data, no paid LLMs." },
         { icon: Gift, title: "Loyalty + Coupons", desc: "Auto-tiered loyalty (Bronze→Platinum), promo codes, gift cards, birthday + anniversary auto-greetings." },
         { icon: Calendar, title: "Reservations", desc: "Book up to 30 days in advance. Walk-in waitlist. Status flow from confirmed to seated to completed." },
         { icon: BarChart3, title: "Live Reports", desc: "Hourly heatmaps, top items, payment splits, day-of-week trends. Filter by any date range." },
-        { icon: Zap, title: "Paytm UPI Direct", desc: "Customers scan a UPI QR; money lands directly in your bank — webhook-confirmed, zero manual screenshot review." },
+        { icon: Zap, title: "PhonePe UPI Direct", desc: "Customers scan a UPI QR; money lands directly in your bank — webhook-confirmed, zero manual screenshot review." },
     ]
     return (
         <section id="features" className="container mx-auto px-4 py-20 md:py-28">
@@ -458,7 +458,7 @@ export function ComparisonTable() {
         { label: "1-click CA export (GSTR-1 + 3B + P&L + BS)", us: true, petpooja: false, posist: false },
         { label: "Realtime KDS via WebSockets", us: true, petpooja: true, posist: true },
         { label: "QR table ordering (PWA)", us: true, petpooja: "partial", posist: true },
-        { label: "Built-in Paytm UPI payments", us: true, petpooja: false, posist: false },
+        { label: "Built-in PhonePe UPI payments", us: true, petpooja: false, posist: false },
         { label: "Demand forecasting + insights", us: true, petpooja: false, posist: false },
         { label: "Tiered loyalty + gift cards + coupons", us: true, petpooja: true, posist: true },
         { label: "Bank reconciliation", us: true, petpooja: false, posist: false },
