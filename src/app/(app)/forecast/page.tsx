@@ -145,7 +145,7 @@ export default function ForecastPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="rounded-2xl glass-strong border border-border/50 neon-border p-12 text-center"
                 >
-                    <div className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta)/0.25)] mb-4">
+                    <div className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-primary/15 mb-4">
                         <Brain className="h-7 w-7 text-primary" />
                     </div>
                     <h2 className="text-xl md:text-2xl font-bold tracking-tight">
@@ -174,7 +174,7 @@ export default function ForecastPage() {
                 <div className="relative p-6 md:p-8">
                     <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
                         <div className="flex items-center gap-3">
-                            <div className="grid place-items-center h-12 w-12 rounded-2xl bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta)/0.25)] shrink-0">
+                            <div className="grid place-items-center h-12 w-12 rounded-2xl bg-primary/15 shrink-0">
                                 <Brain className="h-6 w-6 text-primary" />
                             </div>
                             <div>
@@ -279,7 +279,7 @@ export default function ForecastPage() {
                                         <div key={i} className="flex items-center gap-3">
                                             <span className="text-sm w-32 shrink-0">{DOW_LONG[d.dow]} {d.date.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
                                             <div className="flex-1 h-7 bg-muted rounded overflow-hidden relative">
-                                                <div className="h-full bg-gradient-to-r from-primary/50 to-primary" style={{ width: `${pct}%` }} />
+                                                <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
                                                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium">{formatCurrency(d.revenue)} · {Math.round(d.orders)} bills</span>
                                             </div>
                                         </div>
@@ -306,7 +306,7 @@ export default function ForecastPage() {
                                         <div key={i} className="flex items-center gap-3">
                                             <span className="text-sm w-32 shrink-0 text-muted-foreground">{date.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
                                             <div className="flex-1 h-7 bg-muted rounded overflow-hidden relative">
-                                                <div className="h-full bg-gradient-to-r from-success/50 to-success" style={{ width: `${pct}%` }} />
+                                                <div className="h-full bg-success" style={{ width: `${pct}%` }} />
                                                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium">{formatCurrency(rev)}</span>
                                             </div>
                                         </div>

@@ -128,52 +128,56 @@ type SectionAccent = {
 }
 
 const SECTION_ACCENT: Record<string, SectionAccent> = {
+    // Flat (gradient-free) section accents. Each section keeps a
+    // distinct colour identity — the difference vs. the old palette
+    // is that `ring` and `panel` are now single solid tints rather
+    // than gradient stop-pairs. Same call sites, simpler CSS.
     Operations: {
-        ring: "from-primary/40 to-primary/15 dark:from-primary/20 dark:to-primary/5",
+        ring: "bg-primary/20",
         text: "text-primary",
-        panel: "from-primary/[0.08] via-card to-card dark:from-primary/[0.08] dark:via-card/40 dark:to-card/20",
+        panel: "bg-primary/[0.04]",
         panelBorder: "border-primary/20 dark:border-primary/15",
-        glow: "shadow-[0_0_18px_hsl(var(--neon-cyan)/0.25)]",
+        glow: "",
     },
     Kitchen: {
-        ring: "from-warning/40 to-warning/15 dark:from-warning/25 dark:to-warning/5",
+        ring: "bg-warning/20",
         text: "text-warning",
-        panel: "from-warning/[0.09] via-card to-card dark:from-warning/[0.08] dark:via-card/40 dark:to-card/20",
+        panel: "bg-warning/[0.04]",
         panelBorder: "border-warning/25 dark:border-warning/15",
-        glow: "shadow-[0_0_18px_hsl(var(--warning)/0.25)]",
+        glow: "",
     },
     Catalog: {
-        ring: "from-success/40 to-success/15 dark:from-success/25 dark:to-success/5",
+        ring: "bg-success/20",
         text: "text-success",
-        panel: "from-success/[0.08] via-card to-card dark:from-success/[0.08] dark:via-card/40 dark:to-card/20",
+        panel: "bg-success/[0.04]",
         panelBorder: "border-success/25 dark:border-success/15",
-        glow: "shadow-[0_0_18px_hsl(var(--success)/0.25)]",
+        glow: "",
     },
     Customers: {
-        ring: "from-[hsl(var(--neon-magenta)/0.4)] to-[hsl(var(--neon-magenta)/0.15)] dark:from-[hsl(var(--neon-magenta)/0.25)] dark:to-[hsl(var(--neon-magenta)/0.05)]",
+        ring: "bg-[hsl(var(--neon-magenta)/0.2)]",
         text: "text-[hsl(var(--neon-magenta))]",
-        panel: "from-[hsl(var(--neon-magenta)/0.08)] via-card to-card dark:from-[hsl(var(--neon-magenta)/0.08)] dark:via-card/40 dark:to-card/20",
+        panel: "bg-[hsl(var(--neon-magenta)/0.04)]",
         panelBorder: "border-[hsl(var(--neon-magenta)/0.25)] dark:border-[hsl(var(--neon-magenta)/0.15)]",
-        glow: "shadow-[0_0_18px_hsl(var(--neon-magenta)/0.25)]",
+        glow: "",
     },
     Reports: {
-        ring: "from-primary/40 to-[hsl(var(--neon-magenta)/0.15)] dark:from-primary/25 dark:to-[hsl(var(--neon-magenta)/0.05)]",
+        ring: "bg-primary/20",
         text: "text-primary",
-        panel: "from-primary/[0.07] via-card to-[hsl(var(--neon-magenta)/0.05)] dark:from-primary/[0.07] dark:via-card/40 dark:to-[hsl(var(--neon-magenta)/0.05)]",
+        panel: "bg-primary/[0.04]",
         panelBorder: "border-primary/20 dark:border-primary/15",
-        glow: "shadow-[0_0_18px_hsl(var(--neon-cyan)/0.25)]",
+        glow: "",
     },
     Finance: {
-        ring: "from-amber-500/40 to-amber-500/15 dark:from-amber-500/25 dark:to-amber-500/5",
+        ring: "bg-amber-500/20",
         text: "text-amber-600 dark:text-amber-500",
-        panel: "from-amber-500/[0.08] via-card to-card dark:from-amber-500/[0.08] dark:via-card/40 dark:to-card/20",
+        panel: "bg-amber-500/[0.04]",
         panelBorder: "border-amber-500/25 dark:border-amber-500/15",
-        glow: "shadow-[0_0_18px_rgba(245,158,11,0.25)]",
+        glow: "",
     },
     Setup: {
-        ring: "from-muted-foreground/25 to-muted-foreground/10 dark:from-muted-foreground/15 dark:to-muted-foreground/5",
+        ring: "bg-muted-foreground/15",
         text: "text-muted-foreground",
-        panel: "from-muted/40 via-card to-card dark:from-muted/30 dark:via-card/40 dark:to-card/20",
+        panel: "bg-muted/30",
         panelBorder: "border-border dark:border-border/40",
         glow: "",
     },
@@ -247,7 +251,7 @@ export function MenuCards({ onNavigate, compact }: MenuCardsProps) {
             {!compact && featuredItem && (
                 <section>
                     <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground mb-3 flex items-center gap-2">
-                        <span className="inline-block h-1.5 w-8 rounded-full bg-gradient-to-r from-primary to-[hsl(var(--neon-magenta))]" />
+                        <span className="inline-block h-1.5 w-8 rounded-full bg-primary" />
                         Quick access
                     </h3>
                     <div className="grid gap-3 md:gap-4 md:grid-cols-12">
@@ -305,7 +309,7 @@ export function MenuCards({ onNavigate, compact }: MenuCardsProps) {
                         key={g.section}
                         className={cn(
                             "relative rounded-2xl border p-4 md:p-5 overflow-hidden",
-                            "bg-gradient-to-br shadow-sm dark:shadow-none",
+                            "shadow-sm dark:shadow-none",
                             accent.panel,
                             accent.panelBorder,
                         )}
@@ -316,14 +320,14 @@ export function MenuCards({ onNavigate, compact }: MenuCardsProps) {
                         <div
                             aria-hidden
                             className={cn(
-                                "absolute -top-12 -right-12 h-40 w-40 rounded-full blur-3xl pointer-events-none opacity-50 dark:opacity-40 bg-gradient-to-br",
+                                "absolute -top-12 -right-12 h-40 w-40 rounded-full blur-3xl pointer-events-none opacity-50 dark:opacity-40 ",
                                 accent.ring,
                             )}
                         />
                         <header className="relative mb-3 md:mb-4 flex items-baseline justify-between gap-3 flex-wrap">
                             <div className="min-w-0">
                                 <h3 className="text-sm md:text-base font-bold tracking-tight flex items-center gap-2">
-                                    <span className={cn("inline-block h-1.5 w-8 rounded-full bg-gradient-to-r", accent.ring)} />
+                                    <span className={cn("inline-block h-1.5 w-8 rounded-full", accent.ring)} />
                                     {g.section}
                                 </h3>
                                 {subtitle && (
@@ -400,7 +404,7 @@ function FeaturedPinnedCard({
                 // Light: subtle cyan→magenta gradient on a white card
                 // so the hero feels "premium" without going neon.
                 // Dark: keep the existing aurora over near-black.
-                "bg-gradient-to-br from-primary/[0.10] via-card to-[hsl(var(--neon-magenta)/0.08)] shadow-md",
+                "bg-card border border-border/60 shadow-sm",
                 "dark:from-primary/[0.10] dark:via-card/60 dark:to-[hsl(var(--neon-magenta)/0.10)] dark:shadow-none",
                 "border-primary/30 hover:border-primary/70 hover:shadow-lg hover:-translate-y-0.5",
                 "dark:border-primary/20 dark:hover:shadow-glow",
@@ -423,7 +427,7 @@ function FeaturedPinnedCard({
             <div className="relative flex items-start justify-between gap-3">
                 <div className={cn(
                     "grid place-items-center h-14 w-14 md:h-16 md:w-16 rounded-2xl shrink-0",
-                    "bg-gradient-to-br from-primary/40 to-[hsl(var(--neon-magenta)/0.35)] text-primary",
+                    "bg-primary/15 text-primary",
                     "dark:from-primary/30 dark:to-[hsl(var(--neon-magenta)/0.25)]",
                     "shadow-md dark:shadow-glow",
                     "transition-transform group-hover:scale-105",
@@ -496,7 +500,7 @@ function PinnedCard({
                 // LIGHT: solid card with a soft shadow + tinted
                 // gradient (lighter than the hero's). DARK: keep the
                 // existing low-opacity aurora.
-                "bg-gradient-to-br from-primary/[0.05] via-card to-card shadow-sm",
+                "bg-card border border-border/60 shadow-sm",
                 "dark:from-primary/[0.06] dark:via-card/40 dark:to-[hsl(var(--neon-magenta))/0.06] dark:shadow-none",
                 "border-border hover:border-primary/60 hover:shadow-md hover:-translate-y-0.5",
                 "dark:border-border/60 dark:hover:shadow-glow",
@@ -514,7 +518,7 @@ function PinnedCard({
             <div className="relative flex items-start gap-2.5">
                 <div className={cn(
                     "grid place-items-center h-10 w-10 rounded-xl shrink-0",
-                    "bg-gradient-to-br from-primary/35 to-[hsl(var(--neon-magenta))/0.3] text-primary",
+                    "bg-primary/15 text-primary",
                     "dark:from-primary/25 dark:to-[hsl(var(--neon-magenta))/0.2]",
                     "shadow-sm dark:shadow-glow",
                     "transition-transform group-hover:scale-110",
@@ -589,7 +593,7 @@ function MenuCard({
               * itself reads as a small lifted button at any contrast. */}
             <span
                 className={cn(
-                    "grid place-items-center rounded-xl bg-gradient-to-br transition-all duration-200",
+                    "grid place-items-center rounded-xl  transition-all duration-200",
                     "group-hover:scale-110 group-hover:-translate-y-0.5",
                     "shadow-sm dark:shadow-none",
                     "ring-1 ring-inset ring-white/40 dark:ring-white/[0.04]",

@@ -139,7 +139,7 @@ export default function SignupPage() {
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.15, type: "spring", stiffness: 220, damping: 14 }}
-                        className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-gradient-to-br from-primary/30 to-[hsl(var(--neon-magenta)/0.3)] text-primary backdrop-blur"
+                        className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-primary/15 text-primary backdrop-blur"
                     >
                         <Mail className="h-7 w-7" />
                     </motion.div>
@@ -254,7 +254,7 @@ export default function SignupPage() {
                     className="hidden lg:block order-1 lg:order-2"
                 >
                     <div className="relative">
-                        <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-primary/10 via-transparent to-[hsl(var(--neon-magenta)/0.1)] blur-2xl" />
+                        <div className="absolute -inset-4 rounded-3xl bg-primary/10 blur-2xl" />
                         <div className="relative space-y-3">
                             <ValueProp
                                 icon={FileSpreadsheet}

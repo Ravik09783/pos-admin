@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.15, type: "spring", stiffness: 220, damping: 14 }}
-                        className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-gradient-to-br from-success/30 to-primary/30 text-success backdrop-blur"
+                        className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-success/15 text-success backdrop-blur"
                     >
                         <CheckCircle2 className="h-7 w-7" />
                     </motion.div>

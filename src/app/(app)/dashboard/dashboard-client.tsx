@@ -444,7 +444,7 @@ function AttentionPanel({ rows, loaded }: { rows: { icon: typeof AlertCircle; te
     return (
         <div className="rounded-2xl glass border border-border/50 p-5">
             <div className="flex items-center gap-2 mb-3">
-                <span className="grid place-items-center h-7 w-7 rounded-lg bg-gradient-to-br from-warning/25 to-[hsl(var(--neon-magenta)/0.2)]">
+                <span className="grid place-items-center h-7 w-7 rounded-lg bg-warning/15">
                     <AlertCircle className="h-3.5 w-3.5 text-warning" />
                 </span>
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Needs attention</h3>
@@ -521,7 +521,7 @@ function RoleHero({ role, tenantName, setupComplete }: { role: UserRole; tenantN
                         <Link href={cfg.href}>{cfg.cta} <ArrowRight className="h-4 w-4" /></Link>
                     </Button>
                 </div>
-                <div className="hidden sm:grid place-items-center h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta)/0.25)] shrink-0">
+                <div className="hidden sm:grid place-items-center h-16 w-16 rounded-2xl bg-primary/15 shrink-0">
                     <cfg.icon className="h-7 w-7 text-primary" />
                 </div>
             </div>
@@ -619,7 +619,7 @@ function OpsCounts({ role, data }: { role: UserRole; data: DashData }) {
                 <div key={k.label} className="rounded-2xl glass border border-border/50 p-4 md:p-5">
                     <div className="flex items-center justify-between mb-2">
                         <div className="text-xs md:text-sm text-muted-foreground font-medium">{k.label}</div>
-                        <div className="grid place-items-center h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-[hsl(var(--neon-magenta)/0.15)]">
+                        <div className="grid place-items-center h-8 w-8 rounded-lg bg-primary/15">
                             <k.icon className="h-4 w-4 text-primary" />
                         </div>
                     </div>
@@ -648,7 +648,7 @@ function CaExportHero() {
                     </p>
                     <Button asChild variant="neon" className="mt-5"><Link href="/ca-export">Open CA Export <ArrowRight className="h-4 w-4" /></Link></Button>
                 </div>
-                <div className="hidden sm:grid place-items-center h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta)/0.25)] shrink-0">
+                <div className="hidden sm:grid place-items-center h-16 w-16 rounded-2xl bg-primary/15 shrink-0">
                     <FileSpreadsheet className="h-7 w-7 text-primary" />
                 </div>
             </div>
@@ -892,7 +892,7 @@ function MyProfileCard({ role, profile }: { role: UserRole; profile: DashboardPr
                     /* eslint-disable-next-line @next/next/no-img-element */
                     ? <img src={profile.avatar_url} alt="" className="h-20 w-20 rounded-full object-cover border-2 border-primary/40 shadow-glow" />
                     : (
-                        <div className="h-20 w-20 rounded-full grid place-items-center text-3xl font-bold bg-gradient-to-br from-primary/30 to-[hsl(var(--neon-magenta)/0.25)] text-primary border-2 border-primary/30">
+                        <div className="h-20 w-20 rounded-full grid place-items-center text-3xl font-bold bg-primary/15 text-primary border-2 border-primary/30">
                             {initial}
                         </div>
                     )}
@@ -940,7 +940,7 @@ function AggregatorTeaserCard() {
             <CardContent className="relative p-5">
                 <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-2">
-                        <div className="grid place-items-center h-9 w-9 rounded-lg bg-gradient-to-br from-orange-500/30 to-red-500/20 border border-orange-500/30">
+                        <div className="grid place-items-center h-9 w-9 rounded-lg bg-warning/15 border border-orange-500/30">
                             <Bike className="h-5 w-5 text-orange-400" />
                         </div>
                         <div>

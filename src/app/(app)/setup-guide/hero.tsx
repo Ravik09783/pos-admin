@@ -71,7 +71,7 @@ export function SetupGuideHero({
                 >
                     Your restaurant
                     <br />
-                    <span className="bg-gradient-to-r from-primary via-[hsl(var(--neon-magenta))] to-primary bg-clip-text text-transparent inline-block">
+                    <span className="text-primary inline-block">
                         {headlineHighlight}
                     </span>
                 </motion.h1>

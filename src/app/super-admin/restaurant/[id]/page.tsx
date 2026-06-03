@@ -232,7 +232,7 @@ export default async function SuperAdminTenantDetailPage({
                             /* eslint-disable-next-line @next/next/no-img-element */
                             <img src={t.logo_url} alt="" className="h-14 w-14 rounded-xl object-cover border border-border/60" />
                         ) : (
-                            <div className="h-14 w-14 rounded-xl grid place-items-center bg-gradient-to-br from-primary/30 to-[hsl(var(--neon-magenta)/0.25)] text-primary font-bold text-xl">
+                            <div className="h-14 w-14 rounded-xl grid place-items-center bg-border/60r from-primary/30 to-[hsl(var(--neon-magenta)/0.25)] text-primary font-bold text-xl">
                                 {(t.name ?? "?").slice(0, 1).toUpperCase()}
                             </div>
                         )}

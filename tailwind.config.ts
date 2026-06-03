@@ -210,9 +210,14 @@ const config: Config = {
                     "radial-gradient(ellipse at top, hsl(var(--neon-cyan)/0.08), transparent 60%), radial-gradient(ellipse at bottom right, hsl(var(--neon-magenta)/0.06), transparent 50%)",
             },
             boxShadow: {
-                glow: "0 0 0 1px hsl(var(--border)), 0 8px 30px -8px hsl(var(--neon-cyan)/0.25)",
-                "glow-lg":
-                    "0 0 0 1px hsl(var(--border)), 0 16px 60px -12px hsl(var(--neon-cyan)/0.35)",
+                // `shadow-glow` / `shadow-glow-lg` used to project a
+                // cyan halo to give cards / CTAs a "neon" feel. The
+                // new design system is gradient + glow free — both
+                // utilities now resolve to a clean hairline border
+                // plus a low-tone neutral drop shadow so the surface
+                // still lifts off the background.
+                glow: "0 0 0 1px hsl(var(--border)), 0 1px 3px 0 hsl(0 0% 0% / 0.06)",
+                "glow-lg": "0 0 0 1px hsl(var(--border)), 0 6px 16px -4px hsl(0 0% 0% / 0.08)",
             },
             keyframes: {
                 "accordion-down": {

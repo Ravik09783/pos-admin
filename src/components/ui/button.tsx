@@ -11,7 +11,11 @@ const buttonVariants = cva(
             variant: {
                 default:
                     "bg-primary text-primary-foreground shadow hover:brightness-110 active:scale-[0.98]",
-                neon: "relative bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))] text-primary-foreground font-semibold shadow-glow hover:shadow-glow-lg hover:brightness-110 active:scale-[0.98]",
+                // Flat primary fill — was a primary→magenta gradient with a
+                // glow halo. Switched to a solid colour with a subtle drop
+                // shadow so the CTA matches the reference design's calm,
+                // gradient-free POS look across every theme.
+                neon: "bg-primary text-primary-foreground font-semibold shadow-sm hover:brightness-110 active:scale-[0.98]",
                 destructive:
                     "bg-destructive text-destructive-foreground shadow-sm hover:brightness-110",
                 outline:

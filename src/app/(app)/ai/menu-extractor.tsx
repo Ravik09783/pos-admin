@@ -1154,7 +1154,7 @@ Veg Biryani               240`}</pre>
                             </div>
                             <div className="h-1.5 rounded-full bg-border/60 overflow-hidden">
                                 <div
-                                    className="h-full bg-gradient-to-r from-primary to-[hsl(var(--neon-magenta))] transition-[width] duration-300"
+                                    className="h-full bg-primary transition-[width] duration-300"
                                     style={{ width: `${progress}%` }}
                                 />
                             </div>
@@ -1389,8 +1389,8 @@ function SectionBlock({
               * category boundaries are unmistakable in a long list of
               * sections. A primary-tinted left edge gives each card a
               * clear vertical anchor. */}
-            <div className="relative flex items-center justify-between gap-3 p-4 bg-gradient-to-r from-primary/[0.06] via-muted/40 to-transparent border-b border-border/50 flex-wrap">
-                <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-primary to-[hsl(var(--neon-magenta))]" />
+            <div className="relative flex items-center justify-between gap-3 p-4 bg-muted/30 border-b border-border/50 flex-wrap">
+                <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-primary" />
                 <div className="flex items-center gap-2 flex-1 min-w-[200px] pl-1">
                     <Input
                         value={section.name}

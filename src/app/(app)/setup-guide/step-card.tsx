@@ -64,8 +64,8 @@ const TONES: Record<NonNullable<StepCardProps["tone"]>, {
     line: string
 }> = {
     primary: {
-        badge: "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-[0_4px_18px_-4px_hsl(var(--primary)/0.6)] ring-2 ring-primary/30",
-        iconBg: "bg-gradient-to-br from-primary/15 to-primary/5",
+        badge: "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30",
+        iconBg: "bg-primary/15",
         iconRing: "ring-1 ring-primary/30",
         iconText: "text-primary",
         border: "border-primary/20",
@@ -73,8 +73,8 @@ const TONES: Record<NonNullable<StepCardProps["tone"]>, {
         line: "from-primary/60 to-primary/20",
     },
     magenta: {
-        badge: "bg-gradient-to-br from-[hsl(var(--neon-magenta))] to-[hsl(var(--neon-magenta)/0.8)] text-primary-foreground shadow-[0_4px_18px_-4px_hsl(var(--neon-magenta)/0.6)] ring-2 ring-[hsl(var(--neon-magenta)/0.3)]",
-        iconBg: "bg-gradient-to-br from-[hsl(var(--neon-magenta)/0.15)] to-[hsl(var(--neon-magenta)/0.05)]",
+        badge: "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30",
+        iconBg: "bg-primary/15",
         iconRing: "ring-1 ring-[hsl(var(--neon-magenta)/0.3)]",
         iconText: "text-[hsl(var(--neon-magenta))]",
         border: "border-[hsl(var(--neon-magenta)/0.2)]",
@@ -82,8 +82,8 @@ const TONES: Record<NonNullable<StepCardProps["tone"]>, {
         line: "from-[hsl(var(--neon-magenta)/0.6)] to-[hsl(var(--neon-magenta)/0.2)]",
     },
     success: {
-        badge: "bg-gradient-to-br from-success to-success/80 text-primary-foreground shadow-[0_4px_18px_-4px_hsl(var(--success)/0.6)] ring-2 ring-success/30",
-        iconBg: "bg-gradient-to-br from-success/15 to-success/5",
+        badge: "bg-success text-primary-foreground shadow-sm ring-2 ring-success/30",
+        iconBg: "bg-success/15",
         iconRing: "ring-1 ring-success/30",
         iconText: "text-success",
         border: "border-success/20",
@@ -91,8 +91,8 @@ const TONES: Record<NonNullable<StepCardProps["tone"]>, {
         line: "from-success/60 to-success/20",
     },
     warning: {
-        badge: "bg-gradient-to-br from-warning to-warning/80 text-primary-foreground shadow-[0_4px_18px_-4px_hsl(var(--warning)/0.6)] ring-2 ring-warning/30",
-        iconBg: "bg-gradient-to-br from-warning/15 to-warning/5",
+        badge: "bg-warning text-primary-foreground shadow-sm ring-2 ring-warning/30",
+        iconBg: "bg-warning/15",
         iconRing: "ring-1 ring-warning/30",
         iconText: "text-warning",
         border: "border-warning/20",
@@ -116,7 +116,7 @@ export function StepCard({
                 <span
                     aria-hidden
                     className={cn(
-                        "absolute left-4 md:left-6 top-12 bottom-[-2rem] w-px bg-gradient-to-b",
+                        "absolute left-4 md:left-6 top-12 bottom-[-2rem] w-px bg-border/60",
                         t.line,
                     )}
                 />

@@ -92,7 +92,7 @@ export default function PublicLoyaltyPage() {
                 </Card>
             ) : c ? (
                 <div className="space-y-4">
-                    <Card className="neon-border bg-gradient-to-br from-primary/10 to-[hsl(var(--neon-magenta)/0.1)]">
+                    <Card className="neon-border bg-primary/10">
                         <CardContent className="py-8 text-center space-y-2">
                             <Award className="h-10 w-10 text-primary mx-auto" />
                             <div>

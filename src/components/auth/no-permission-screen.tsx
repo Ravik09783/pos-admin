@@ -163,7 +163,7 @@ function HelperRow({ helper }: { helper: Helper }) {
         .split(/\s+/).map((s) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase()
     return (
         <li className="rounded-lg border border-border/60 p-3 flex items-center gap-3 hover:border-border transition-colors">
-            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta)/0.25)] grid place-items-center text-xs font-semibold shrink-0">
+            <div className="h-10 w-10 rounded-full  from-primary/25 to-[hsl(var(--neon-magenta)/0.25)] grid place-items-center text-xs font-semibold shrink-0">
                 {initials || "?"}
             </div>
             <div className="flex-1 min-w-0">

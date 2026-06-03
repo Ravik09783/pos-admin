@@ -1214,7 +1214,7 @@ export default function QRMenuPage() {
                         exit={{ y: 100, opacity: 0 }}
                         whileTap={{ scale: 0.96 }}
                         onClick={() => setCartOpen(true)}
-                        className="fixed bottom-5 left-4 right-4 z-30 max-w-2xl mx-auto rounded-2xl bg-gradient-to-r from-primary to-[hsl(var(--neon-magenta))] p-4 shadow-glow-lg flex items-center justify-between text-primary-foreground font-semibold"
+                        className="fixed bottom-5 left-4 right-4 z-30 max-w-2xl mx-auto rounded-2xl bg-primary p-4 shadow-glow-lg flex items-center justify-between text-primary-foreground font-semibold"
                     >
                         <motion.span
                             key={fly.bumpKey}
@@ -1477,7 +1477,7 @@ function CatChip({ active, onClick, children }: { active: boolean; onClick: () =
             className={cn(
                 "px-4 py-1.5 rounded-full text-sm whitespace-nowrap font-medium transition-all relative",
                 active
-                    ? "bg-gradient-to-r from-primary to-[hsl(var(--neon-magenta))] text-primary-foreground shadow-glow"
+                    ? "bg-primary text-primary-foreground shadow-glow"
                     : "bg-card/60 text-muted-foreground border border-border/60",
             )}
         >

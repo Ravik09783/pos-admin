@@ -364,7 +364,7 @@ function Avatar({ name, src, initials }: { name: string; src: string | null; ini
         return <img src={src} alt={name} className="h-11 w-11 rounded-full object-cover border border-border/60 shrink-0" />
     }
     return (
-        <div className="h-11 w-11 rounded-full bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta))/0.25] grid place-items-center text-sm font-semibold shrink-0">
+        <div className="h-11 w-11 rounded-full bg-primary/15 grid place-items-center text-sm font-semibold shrink-0">
             {initials}
         </div>
     )

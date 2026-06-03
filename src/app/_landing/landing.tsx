@@ -121,7 +121,7 @@ export function Header() {
         )}>
             <div className="container mx-auto flex items-center justify-between py-4 px-4">
                 <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-                    <span className="grid place-items-center h-9 w-9 rounded-lg bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))] text-primary-foreground shadow-glow">
+                    <span className="grid place-items-center h-9 w-9 rounded-lg bg-primary text-primary-foreground shadow-sm">
                         <Sparkles className="h-4 w-4" />
                     </span>
                     <span className="text-lg">RestoPOS</span>
@@ -357,13 +357,13 @@ export function Features() {
                         <CardTilt className="h-full">
                             <div className="group relative rounded-2xl glass border border-border/50 p-6 h-full transition-all hover:border-primary/40 hover:shadow-glow">
                                 <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                    <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-[hsl(var(--neon-magenta)/0.2)] opacity-50 blur-md" />
+                                    <div className="absolute -inset-px rounded-2xl bg-border/60r from-primary/20 via-transparent to-[hsl(var(--neon-magenta)/0.2)] opacity-50 blur-md" />
                                 </div>
                                 <div className="relative">
                                     <motion.div
                                         whileHover={{ scale: 1.1, rotate: 6 }}
                                         transition={{ type: "spring", stiffness: 300, damping: 18 }}
-                                        className="grid place-items-center h-11 w-11 rounded-lg bg-gradient-to-br from-primary/20 to-[hsl(var(--neon-magenta)/0.2)] mb-4"
+                                        className="grid place-items-center h-11 w-11 rounded-lg bg-primary/15 mb-4"
                                     >
                                         <f.icon className="h-5 w-5 text-primary" />
                                     </motion.div>
@@ -419,7 +419,7 @@ export function HowItWorks() {
                     >
                         <CardTilt intensity={0.4} className="h-full">
                             <div className="relative rounded-2xl glass border border-border/50 p-6 h-full overflow-hidden group">
-                                <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-gradient-to-br from-primary/15 to-[hsl(var(--neon-magenta)/0.1)] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                                <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full bg-border/60r from-primary/15 to-[hsl(var(--neon-magenta)/0.1)] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
                                 <div className="relative">
                                     <div className="text-5xl font-bold text-gradient opacity-90 mb-3 flex items-center gap-3">
                                         {step.num}
@@ -501,7 +501,7 @@ export function ComparisonTable() {
                                     <motion.span
                                         animate={{ rotate: [0, 8, -8, 0] }}
                                         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                                        className="grid place-items-center h-6 w-6 rounded bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))]"
+                                        className="grid place-items-center h-6 w-6 rounded bg-border/60r from-primary to-[hsl(var(--neon-magenta))]"
                                     >
                                         <Sparkles className="h-3 w-3 text-primary-foreground" />
                                     </motion.span>
@@ -588,7 +588,7 @@ export function Pricing() {
                                 {active && (
                                     <motion.span
                                         layoutId="region-pill"
-                                        className="absolute inset-0 rounded-full bg-gradient-to-r from-primary to-[hsl(var(--neon-magenta))] shadow-glow"
+                                        className="absolute inset-0 rounded-full bg-primary shadow-glow"
                                         transition={{ type: "spring", duration: 0.4 }}
                                     />
                                 )}
@@ -638,7 +638,7 @@ export function Pricing() {
                             <div className={cn(
                                 "relative rounded-2xl p-6 h-full flex flex-col",
                                 plan.highlight
-                                    ? "glass-strong border-2 border-primary/40 shadow-glow-lg bg-gradient-to-b from-primary/10 to-transparent"
+                                    ? "glass-strong border-2 border-primary/40 shadow-glow-lg bg-border/60 from-primary/10 to-transparent"
                                     : "glass border border-border/50",
                             )}>
                                 <div className="mb-5">
@@ -768,7 +768,7 @@ export function Testimonials() {
                                     </motion.div>
                                     <p className="text-sm leading-relaxed mb-4">&ldquo;{q.quote}&rdquo;</p>
                                     <div className="flex items-center gap-3 pt-4 border-t border-border/40">
-                                        <div className="grid place-items-center h-9 w-9 rounded-full bg-gradient-to-br from-primary/30 to-[hsl(var(--neon-magenta)/0.3)] font-semibold text-sm">
+                                        <div className="grid place-items-center h-9 w-9 rounded-full bg-primary/15 font-semibold text-sm">
                                             {q.name.charAt(0)}
                                         </div>
                                         <div>
@@ -928,7 +928,7 @@ export function Footer() {
                 <div className="grid md:grid-cols-4 gap-8 mb-10">
                     <div className="md:col-span-2">
                         <Link href="/" className="inline-flex items-center gap-2 font-semibold mb-3">
-                            <span className="grid place-items-center h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))] text-primary-foreground">
+                            <span className="grid place-items-center h-8 w-8 rounded-lg bg-primary text-primary-foreground">
                                 <Sparkles className="h-4 w-4" />
                             </span>
                             <span>RestoPOS</span>

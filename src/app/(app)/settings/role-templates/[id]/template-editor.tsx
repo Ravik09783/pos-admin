@@ -312,7 +312,7 @@ export function TemplateEditor({
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img src={u.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover border border-border/60 shrink-0" />
                                         ) : (
-                                            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta))/0.25] grid place-items-center text-xs font-semibold shrink-0">
+                                            <div className="h-9 w-9 rounded-full bg-primary/15 grid place-items-center text-xs font-semibold shrink-0">
                                                 {initials}
                                             </div>
                                         )}

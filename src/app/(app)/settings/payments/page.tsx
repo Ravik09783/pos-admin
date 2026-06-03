@@ -1251,7 +1251,7 @@ function Node({
         <div className="flex flex-col items-center text-center gap-1.5 min-w-0">
             <div className={cn(
                 "grid place-items-center h-10 w-10 rounded-xl shrink-0",
-                accent ? "bg-gradient-to-br from-primary/30 to-[hsl(var(--neon-magenta)/0.25)] text-primary" : "bg-muted/50 text-muted-foreground",
+                accent ? "bg-primary/15 text-primary" : "bg-muted/50 text-muted-foreground",
             )}>
                 <Icon className="h-4 w-4" />
             </div>
@@ -1290,7 +1290,7 @@ function SetupStepper({
             {/* Bar */}
             <div className="h-1.5 w-full rounded-full bg-border/60 overflow-hidden">
                 <div
-                    className="h-full bg-gradient-to-r from-primary to-[hsl(var(--neon-magenta))] transition-[width] duration-300"
+                    className="h-full bg-primary transition-[width] duration-300"
                     style={{ width: `${(done / total) * 100}%` }}
                 />
             </div>

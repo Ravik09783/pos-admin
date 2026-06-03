@@ -108,7 +108,7 @@ export function AIMenuImportShowcase() {
                                     whileInView={{ y: "100%", opacity: [0, 1, 1, 0] }}
                                     viewport={{ once: false, margin: "-100px" }}
                                     transition={{ duration: 2.4, ease: "easeInOut", repeat: Infinity, repeatDelay: 1.2 }}
-                                    className="pointer-events-none absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-transparent via-primary/25 to-transparent"
+                                    className="pointer-events-none absolute inset-x-0 top-0 h-1/3 bg-border/60 from-transparent via-primary/25 to-transparent"
                                 />
                                 <div className="text-center text-xs uppercase tracking-[0.4em] text-muted-foreground mb-3">
                                     The Spice Junction

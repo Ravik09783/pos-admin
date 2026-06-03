@@ -70,7 +70,7 @@ export default function ResetPasswordPage() {
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                     className="glass-strong rounded-2xl border border-border/50 neon-border p-8 text-center"
                 >
-                    <div className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-gradient-to-br from-destructive/30 to-[hsl(var(--neon-magenta)/0.3)] text-destructive backdrop-blur">
+                    <div className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-destructive/15 text-destructive backdrop-blur">
                         <AlertCircle className="h-7 w-7" />
                     </div>
                     <h1 className="mt-5 text-2xl md:text-3xl font-bold tracking-tight">
@@ -100,7 +100,7 @@ export default function ResetPasswordPage() {
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.15, type: "spring", stiffness: 220, damping: 14 }}
-                        className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-gradient-to-br from-success/30 to-primary/30 text-success backdrop-blur"
+                        className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-success/15 text-success backdrop-blur"
                     >
                         <CheckCircle2 className="h-7 w-7" />
                     </motion.div>

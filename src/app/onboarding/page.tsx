@@ -248,7 +248,7 @@ export default function OnboardingPage() {
             <div className="relative z-10 container mx-auto py-10 px-4">
                 <div className="mb-6 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                        <span className="grid place-items-center h-8 w-8 rounded-md bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))] text-primary-foreground">
+                        <span className="grid place-items-center h-8 w-8 rounded-md bg-primary text-primary-foreground">
                             <Sparkles className="h-4 w-4" />
                         </span>
                         <span className="font-semibold text-lg">RestoPOS</span>

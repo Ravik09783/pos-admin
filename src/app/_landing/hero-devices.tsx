@@ -17,7 +17,7 @@ export function HeroDevices() {
         >
             {/* glowing backdrop */}
             <div className="absolute inset-0 -z-10">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-80 w-80 rounded-full bg-gradient-to-br from-primary/40 to-[hsl(var(--neon-magenta)/0.4)] blur-3xl opacity-50" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-80 w-80 rounded-full bg-border/60r from-primary/40 to-[hsl(var(--neon-magenta)/0.4)] blur-3xl opacity-50" />
             </div>
 
             {/* TABLET (POS) */}
@@ -33,7 +33,7 @@ export function HeroDevices() {
                     {/* Topbar */}
                     <div className="flex items-center justify-between px-3 py-2 border-b border-border/40 text-xs">
                         <div className="flex items-center gap-1.5">
-                            <span className="grid place-items-center h-5 w-5 rounded bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))]">
+                            <span className="grid place-items-center h-5 w-5 rounded bg-border/60r from-primary to-[hsl(var(--neon-magenta))]">
                                 <Sparkles className="h-2.5 w-2.5 text-primary-foreground" />
                             </span>
                             <span className="font-semibold">Spice Junction</span>
@@ -61,7 +61,7 @@ export function HeroDevices() {
                                     initial={{ opacity: 0, scale: 0.85 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     transition={{ delay: 0.4 + i * 0.05 }}
-                                    className={`rounded-md ${it.c} bg-gradient-to-br to-card/40 border border-border/40 p-2 text-[10px]`}
+                                    className={`rounded-md ${it.c} bg-border/60r to-card/40 border border-border/40 p-2 text-[10px]`}
                                 >
                                     <div className="font-semibold leading-tight">{it.name}</div>
                                     <div className="text-primary mt-1 text-xs font-bold">{it.price}</div>
@@ -102,7 +102,7 @@ export function HeroDevices() {
                                 initial={{ opacity: 0, scale: 0.8 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ delay: 1.4, type: "spring" }}
-                                className="mt-2 rounded bg-gradient-to-r from-primary to-[hsl(var(--neon-magenta))] py-1.5 text-center font-bold text-primary-foreground text-[10px] flex items-center justify-center gap-1"
+                                className="mt-2 rounded bg-primary py-1.5 text-center font-bold text-primary-foreground text-[10px] flex items-center justify-center gap-1"
                             >
                                 <Receipt className="h-2.5 w-2.5" /> Generate bill
                             </motion.div>
@@ -128,7 +128,7 @@ export function HeroDevices() {
                     {/* header */}
                     <div className="px-3 pb-2 border-b border-border/40">
                         <div className="flex items-center gap-1.5">
-                            <span className="grid place-items-center h-5 w-5 rounded bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))]">
+                            <span className="grid place-items-center h-5 w-5 rounded bg-border/60r from-primary to-[hsl(var(--neon-magenta))]">
                                 <Sparkles className="h-2.5 w-2.5 text-primary-foreground" />
                             </span>
                             <div className="text-xs font-bold leading-tight">Spice Junction</div>
@@ -164,7 +164,7 @@ export function HeroDevices() {
                                 </div>
                                 <motion.div
                                     whileTap={{ scale: 0.85 }}
-                                    className="grid place-items-center h-6 w-6 rounded bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))] text-primary-foreground"
+                                    className="grid place-items-center h-6 w-6 rounded bg-primary text-primary-foreground"
                                 >
                                     <Plus className="h-3 w-3" />
                                 </motion.div>
@@ -177,7 +177,7 @@ export function HeroDevices() {
                         initial={{ y: 50, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 1.6, type: "spring" }}
-                        className="m-2 rounded-xl bg-gradient-to-r from-primary to-[hsl(var(--neon-magenta))] p-2 flex items-center gap-2 text-primary-foreground"
+                        className="m-2 rounded-xl bg-primary p-2 flex items-center gap-2 text-primary-foreground"
                     >
                         <span className="grid place-items-center h-6 w-6 rounded-full bg-white/20">
                             <ShoppingBag className="h-3 w-3" />

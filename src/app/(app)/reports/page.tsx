@@ -199,7 +199,7 @@ export default function ReportsPage() {
                                                             <span>{formatCurrency(p.amount)} ({pct.toFixed(1)}%)</span>
                                                         </div>
                                                         <div className="h-2 rounded-full bg-muted overflow-hidden">
-                                                            <div className="h-full bg-gradient-to-r from-primary to-[hsl(var(--neon-magenta))]" style={{ width: `${pct}%` }} />
+                                                            <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
                                                         </div>
                                                     </div>
                                                 )
@@ -254,7 +254,7 @@ export default function ReportsPage() {
                                                     <div key={day} className="flex items-center gap-3">
                                                         <span className="text-xs text-muted-foreground w-28 shrink-0">{new Date(day).toLocaleDateString("en-IN", { weekday: "short", month: "short", day: "numeric" })}</span>
                                                         <div className="flex-1 h-7 bg-muted rounded overflow-hidden relative">
-                                                            <div className="h-full bg-gradient-to-r from-primary/50 to-primary" style={{ width: `${pct}%` }} />
+                                                            <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
                                                             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium">{formatCurrency(amt)}</span>
                                                         </div>
                                                     </div>
@@ -269,7 +269,7 @@ export default function ReportsPage() {
                 </>
             )}
 
-            <Card className="neon-border bg-gradient-to-br from-primary/5 to-[hsl(var(--neon-magenta)/0.05)]">
+            <Card className="neon-border bg-primary/10">
                 <CardContent className="pt-6 flex items-center justify-between gap-4 flex-wrap">
                     <div>
                         <Badge variant="neon" className="mb-2">For your CA</Badge>

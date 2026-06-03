@@ -55,7 +55,7 @@ export default function DemoPage() {
                         <ul className="mt-8 space-y-3">
                             {PERKS.map((p) => (
                                 <li key={p.title} className="flex gap-3">
-                                    <div className="grid place-items-center h-9 w-9 rounded-lg bg-gradient-to-br from-primary/20 to-[hsl(var(--neon-magenta)/0.2)] shrink-0">
+                                    <div className="grid place-items-center h-9 w-9 rounded-lg bg-primary/15 shrink-0">
                                         <p.icon className="h-4 w-4 text-primary" />
                                     </div>
                                     <div>

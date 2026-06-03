@@ -17,6 +17,7 @@ import {
     LogOut,
     Newspaper,
     Receipt,
+    Search,
     Settings,
     ShieldAlert,
     ShoppingCart,
@@ -44,7 +45,6 @@ import { BranchSwitcher } from "./branch-switcher"
 import { MenuLauncher } from "./menu-cards"
 import { usePendingCount, useUnreadPostCount } from "./nav"
 import { NotificationPermissionButton } from "./notification-permission-button"
-import { ThemeToggle } from "./theme-toggle"
 import { OfflineBanner } from "./offline-banner"
 import type { UserRole } from "@/types/database"
 
@@ -258,7 +258,7 @@ export function Topbar({
               * primary→magenta gradient elsewhere. */}
             <div
                 aria-hidden
-                className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent"
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-border"
             />
 
             {/* ── LEFT: Brand identity ───────────────────────────── */}
@@ -297,7 +297,7 @@ export function Topbar({
                 ) : (
                     <span
                         aria-hidden
-                        className="h-9 w-9 rounded-lg grid place-items-center shrink-0 text-xs font-bold ring-1 ring-border/60 bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta)/0.2)] text-primary shadow-sm"
+                        className="h-9 w-9 rounded-lg grid place-items-center shrink-0 text-xs font-bold ring-1 ring-border/60 bg-primary/15 text-primary"
                     >
                         {tenantInitials}
                     </span>
@@ -343,17 +343,43 @@ export function Topbar({
                 <div className="hidden md:flex"><OfflineBanner tenantId={tenantId} /></div>
             </div>
 
-            {/* ── CENTER: Live clock + date ──────────────────────────
-              * A small pill that anchors the otherwise-empty middle
-              * of the bar. Hidden on small screens (where the empty
-              * space doesn't exist and the bar is already tight) and
-              * suppressed on the server render to avoid hydration
-              * mismatch from Date(). For restaurant staff this is a
-              * genuinely useful focal point — shift hand-offs, KDS
-              * prep windows, last-orders cut-offs all want a glance
-              * at the time. */}
+            {/* ── CENTER: Global search trigger + live clock ─────────
+              * The search button opens the command palette (⌘K / Ctrl+K
+              * also work from any page). Looks like a search input but
+              * is actually a button — same pattern as Linear / Vercel /
+              * Notion. Discoverable for touch users who don't know the
+              * shortcut yet. On smaller screens we collapse to a
+              * standalone icon button so the bar stays tight. */}
+            <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("command-palette:open"))}
+                className="hidden md:flex items-center gap-2.5 h-9 px-3 max-w-md flex-1 rounded-full border border-border/60 bg-muted/30 hover:bg-muted/50 transition-colors text-left text-sm text-muted-foreground"
+                aria-label="Open global search"
+                title="Open global search (⌘K / Ctrl+K)"
+            >
+                <Search className="h-3.5 w-3.5 shrink-0" />
+                <span className="flex-1 truncate">Search pages, items, customers, bills…</span>
+                <kbd className="hidden lg:inline-flex items-center gap-0.5 font-mono text-[10px] bg-background/80 border border-border rounded px-1.5 py-0.5 shrink-0">
+                    {typeof navigator !== "undefined" && navigator.platform.toLowerCase().includes("mac") ? "⌘K" : "Ctrl K"}
+                </kbd>
+            </button>
+            {/* Icon-only fallback on small screens so the search is
+              * still one tap away when the full input doesn't fit. */}
+            <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden h-9 w-9 shrink-0"
+                onClick={() => window.dispatchEvent(new CustomEvent("command-palette:open"))}
+                aria-label="Open global search"
+                title="Open global search"
+            >
+                <Search className="h-4 w-4" />
+            </Button>
+
+            {/* ── CENTER: Live clock + date — only when there's room
+              * past the search bar (xl screens). */}
             {now && (
-                <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-border/60 bg-muted/30 shrink-0">
+                <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full border border-border/60 bg-muted/30 shrink-0">
                     <Clock className="h-3.5 w-3.5 text-primary" />
                     <span className="text-sm font-semibold tabular-nums tracking-tight">{timeStr}</span>
                     <span className="text-[11px] text-muted-foreground tabular-nums">·  {dateStr}</span>
@@ -363,16 +389,15 @@ export function Topbar({
             {/* ── RIGHT: Toolkit + avatar ────────────────────────── */}
             <div className="flex items-center gap-2 shrink-0">
                 <div className="md:hidden"><OfflineBanner tenantId={tenantId} /></div>
-                {/* Grouped controls — branch switcher / notification
-                  * prompt / theme toggle all live in a single softly-
-                  * tinted "rail" so they read as one cluster rather
-                  * than three loose icons. Faint dividers between
-                  * the icon buttons emphasise the grouping without
-                  * overwhelming the visual. */}
+                {/* Grouped controls — branch switcher + notification
+                  * prompt live in a single softly-tinted "rail" so
+                  * they read as one cluster rather than loose icons.
+                  * The theme picker used to live here too; it's now
+                  * in the app footer (see AppFooter) to keep the
+                  * topbar focused on session/context controls. */}
                 <div className="flex items-center gap-0.5 rounded-lg bg-muted/30 border border-border/40 p-0.5 shrink-0">
                     <BranchSwitcher />
                     <NotificationPermissionButton />
-                    <ThemeToggle />
                 </div>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -403,7 +428,7 @@ export function Topbar({
                                 : (userName || userEmail)
                                     ? <span
                                         aria-hidden
-                                        className="h-7 w-7 rounded-full grid place-items-center shrink-0 text-[11px] font-bold border border-border/60 bg-gradient-to-br from-primary/30 to-[hsl(var(--neon-magenta)/0.25)] text-primary"
+                                        className="h-7 w-7 rounded-full grid place-items-center shrink-0 text-[11px] font-bold border border-border/60 bg-primary/15 text-primary"
                                     >
                                         {(userName || userEmail).slice(0, 1).toUpperCase()}
                                     </span>

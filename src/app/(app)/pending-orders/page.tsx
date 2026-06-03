@@ -165,7 +165,7 @@ export default function PendingOrdersPage() {
                         <motion.div
                             animate={orders.length > 0 ? { scale: [1, 1.08, 1] } : {}}
                             transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                            className="grid place-items-center h-12 w-12 rounded-2xl bg-gradient-to-br from-warning/30 to-[hsl(var(--neon-magenta)/0.25)] shrink-0"
+                            className="grid place-items-center h-12 w-12 rounded-2xl bg-warning/15 shrink-0"
                         >
                             <AlertCircle className="h-6 w-6 text-warning" />
                         </motion.div>
@@ -202,7 +202,7 @@ export default function PendingOrdersPage() {
                     transition={{ delay: 0.1, duration: 0.5 }}
                     className="rounded-2xl glass-strong border border-border/50 neon-border p-12 text-center"
                 >
-                    <div className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-gradient-to-br from-success/25 to-primary/25 mb-4">
+                    <div className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-primary/15 mb-4">
                         <CheckCircle2 className="h-7 w-7 text-success" />
                     </div>
                     <h2 className="text-xl md:text-2xl font-bold tracking-tight">

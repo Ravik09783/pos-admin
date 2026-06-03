@@ -23,7 +23,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <header className="relative z-10 border-b border-border/40 bg-background/40 backdrop-blur-xl">
                 <div className="container mx-auto flex items-center justify-between py-4 px-4">
                     <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-                        <span className="grid place-items-center h-9 w-9 rounded-lg bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))] text-primary-foreground shadow-glow">
+                        <span className="grid place-items-center h-9 w-9 rounded-lg bg-primary text-primary-foreground shadow-sm">
                             <Sparkles className="h-4 w-4" />
                         </span>
                         <span className="text-lg">RestoPOS</span>

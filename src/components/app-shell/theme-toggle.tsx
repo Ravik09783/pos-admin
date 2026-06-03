@@ -23,7 +23,17 @@ import { cn } from "@/lib/utils"
  * one click. Festival cards show a tiny sun/moon glyph because that group
  * mixes both modes (Holi is light, Diwali is dark, etc.).
  */
-export function ThemeToggle({ align = "end" }: { align?: "start" | "center" | "end" }) {
+export function ThemeToggle({
+    align = "end",
+    side = "bottom",
+}: {
+    align?: "start" | "center" | "end"
+    /** Which side of the trigger the picker opens from. Pass `"top"`
+     *  when rendering the toggle from a bottom-anchored surface like
+     *  the app footer — Radix's `avoidCollisions` would handle it,
+     *  but explicit is clearer and avoids a flicker at first mount. */
+    side?: "top" | "bottom" | "left" | "right"
+}) {
     const { theme, setTheme, themes } = useTheme()
     const current = themes.find((t) => t.id === theme)
     const isDefault = theme === DEFAULT_THEME
@@ -59,6 +69,8 @@ export function ThemeToggle({ align = "end" }: { align?: "start" | "center" | "e
             </DropdownMenuTrigger>
             <DropdownMenuContent
                 align={align}
+                side={side}
+                sideOffset={6}
                 // Wide enough for 2 columns on desktop, capped at the viewport
                 // on mobile so the dropdown never overflows.
                 className="w-[min(calc(100vw-1rem),32rem)] p-0"

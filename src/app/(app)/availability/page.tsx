@@ -199,7 +199,7 @@ export default function AvailabilityPage() {
                     {grouped.map((g) => (
                         <section key={g.name}>
                             <h3 className="text-[10px] uppercase tracking-[0.18em] font-bold text-muted-foreground mb-2.5 flex items-center gap-2">
-                                <span className="inline-block h-1 w-6 rounded-full bg-gradient-to-r from-primary/30 to-primary/5" />
+                                <span className="inline-block h-1 w-6 rounded-full bg-primary/15" />
                                 {g.name}
                                 <span className="text-[10px] font-medium normal-case tracking-normal text-muted-foreground/70">
                                     · {g.items.length} item{g.items.length === 1 ? "" : "s"}
@@ -240,7 +240,7 @@ function StatCard({
     return (
         <Card className={cn("relative overflow-hidden", toneClass.border)}>
             <CardContent className="p-4 flex items-center gap-3">
-                <span className={cn("grid place-items-center h-11 w-11 rounded-xl bg-gradient-to-br", toneClass.ring)}>
+                <span className={cn("grid place-items-center h-11 w-11 rounded-xl bg-border/60r", toneClass.ring)}>
                     <Icon className={cn("h-5 w-5", toneClass.text)} />
                 </span>
                 <div className="min-w-0">

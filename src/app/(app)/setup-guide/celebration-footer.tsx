@@ -53,14 +53,14 @@ export function CelebrationFooter() {
                     whileInView={{ scale: 1, rotate: 0, opacity: 1 }}
                     viewport={{ once: true, margin: "-80px" }}
                     transition={{ duration: 0.55, delay: 0.1, ease: [0.34, 1.56, 0.64, 1] }}
-                    className="inline-grid place-items-center h-14 w-14 rounded-2xl bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))] text-primary-foreground shadow-[0_8px_36px_-8px_hsl(var(--primary)/0.55)]"
+                    className="inline-grid place-items-center h-14 w-14 rounded-2xl bg-primary text-primary-foreground shadow-sm"
                 >
                     <Rocket className="h-7 w-7" />
                 </motion.div>
 
                 <h2 className="mt-5 text-2xl md:text-3xl font-extrabold tracking-tight">
                     That&apos;s it.{" "}
-                    <span className="bg-gradient-to-r from-primary to-[hsl(var(--neon-magenta))] bg-clip-text text-transparent">
+                    <span className="text-primary">
                         Ready to ring up your first order?
                     </span>
                 </h2>

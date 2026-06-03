@@ -9,7 +9,9 @@ interface PageHeaderProps {
     kicker?: string
     /** Plain prefix of the title (e.g. "Run your kitchen"). */
     title: string
-    /** Highlighted suffix rendered in the cyan→magenta gradient. */
+    /** Highlighted suffix rendered as primary-coloured accent text
+     *  (was a cyan→magenta gradient; now flat to match the rest of
+     *  the gradient-free design system). */
     highlight?: string
     /** Subtitle/description below the title. */
     description?: React.ReactNode
@@ -20,9 +22,9 @@ interface PageHeaderProps {
 }
 
 /**
- * Shared page header used across the authenticated app. Gives every inner
- * page the same gradient-title + neon-badge + framer-motion entry treatment
- * as the homepage, so the visual language is consistent end-to-end.
+ * Shared page header used across the authenticated app. Title +
+ * accent suffix + small kicker badge + a quiet motion entry, all in
+ * the flat (gradient-free) design language used end-to-end.
  *
  * Usage:
  *   <PageHeader

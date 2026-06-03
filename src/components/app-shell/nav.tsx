@@ -429,7 +429,7 @@ export function NavBody({ onNavigate, role }: { onNavigate?: () => void; role: U
 export function NavBranding() {
     return (
         <Link href="/dashboard" className="flex items-center gap-2 px-5 py-5 border-b border-border/50">
-            <span className="grid place-items-center h-8 w-8 rounded-md bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))] text-primary-foreground">
+            <span className="grid place-items-center h-8 w-8 rounded-md bg-primary text-primary-foreground">
                 <Sparkles className="h-4 w-4" />
             </span>
             <span className="font-semibold tracking-tight">RestoPOS</span>

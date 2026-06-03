@@ -126,7 +126,7 @@ export default function CustomerDisplaySetupPage() {
             {/* ── How it works — primer card ─────────────────────────── */}
             <Card className="border-primary/30">
                 <CardHeader className="flex-row items-start gap-3 space-y-0">
-                    <span className="grid place-items-center h-10 w-10 rounded-lg bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta)/0.2)] shrink-0">
+                    <span className="grid place-items-center h-10 w-10 rounded-lg bg-primary/15 shrink-0">
                         <Monitor className="h-5 w-5 text-primary" />
                     </span>
                     <div>

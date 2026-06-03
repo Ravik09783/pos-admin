@@ -117,7 +117,7 @@ export function ItemAddDialog<T extends AddableItem>({
                                 loading="lazy"
                             />
                         ) : (
-                            <div className="w-full h-40 grid place-items-center bg-gradient-to-br from-primary/15 via-card to-[hsl(var(--neon-magenta)/0.12)]">
+                            <div className="w-full h-40 grid place-items-center  from-primary/15 via-card to-[hsl(var(--neon-magenta)/0.12)]">
                                 <span className="text-6xl font-bold text-primary/40 select-none">
                                     {item.name.charAt(0).toUpperCase()}
                                 </span>

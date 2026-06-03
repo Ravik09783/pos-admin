@@ -433,7 +433,7 @@ export function CheckoutPreviewDialog({
 
                 {/* Visible header — runs full width across both columns */}
                 <div className="flex items-center gap-3 px-5 pt-5 pb-3 border-b border-border/40">
-                    <span className="grid place-items-center h-10 w-10 rounded-lg bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta)/0.2)]">
+                    <span className="grid place-items-center h-10 w-10 rounded-lg  from-primary/25 to-[hsl(var(--neon-magenta)/0.2)]">
                         <Receipt className="h-5 w-5 text-primary" />
                     </span>
                     <div className="min-w-0">

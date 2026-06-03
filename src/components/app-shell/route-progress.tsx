@@ -142,7 +142,7 @@ export function RouteProgress() {
             }}
         >
             <div
-                className="h-full bg-gradient-to-r from-[hsl(var(--neon-cyan))] via-[hsl(var(--primary))] to-[hsl(var(--neon-magenta))] shadow-[0_0_10px_hsl(var(--primary))]"
+                className="h-full bg-primary shadow-sm"
                 style={{ width: `${width}%`, transition: "width 220ms ease-out" }}
             />
         </div>

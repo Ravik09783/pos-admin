@@ -76,7 +76,7 @@ export function CAExportShowcase() {
                             <motion.div
                                 animate={{ rotate: [0, -8, 8, 0] }}
                                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                                className="grid place-items-center h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))] shadow-glow shrink-0"
+                                className="grid place-items-center h-12 w-12 rounded-xl bg-border/60r from-primary to-[hsl(var(--neon-magenta))] shadow-glow shrink-0"
                             >
                                 <Package className="h-6 w-6 text-primary-foreground" />
                             </motion.div>
@@ -94,7 +94,7 @@ export function CAExportShowcase() {
                                     whileInView={{ opacity: 1, x: 0 }}
                                     viewport={{ once: true }}
                                     transition={{ delay: 0.2 + i * 0.1 }}
-                                    className={`flex items-center gap-3 rounded-lg bg-gradient-to-r ${f.color} border border-border/40 p-3 group hover:border-primary/40 transition-colors`}
+                                    className={`flex items-center gap-3 rounded-lg  ${f.color} border border-border/40 p-3 group hover:border-primary/40 transition-colors`}
                                 >
                                     <f.icon className="h-5 w-5 text-foreground/80 shrink-0" />
                                     <div className="flex-1 min-w-0">

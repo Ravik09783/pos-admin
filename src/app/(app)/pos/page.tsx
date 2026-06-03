@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { CheckCircle2, ExternalLink, Lightbulb, Loader2, Minus, MonitorSmartphone, Plus, Receipt, RefreshCw, Search, Tag, Trash2, Utensils, X } from "lucide-react"
+import { CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, FileText, Grid3x3, HelpCircle, Lightbulb, Loader2, LogOut, Minus, MonitorSmartphone, Plus, Receipt, RefreshCw, Search, Settings as SettingsIcon, Tag, Trash2, Utensils, UtensilsCrossed, X } from "lucide-react"
+import Link from "next/link"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -111,7 +112,7 @@ export default function POSPage() {
     // highlight + scroll the line into view so the staffer instantly sees
     // their add land, even if the cart is offscreen on a narrow display.
     const [highlightIdx, setHighlightIdx] = useState<number | null>(null)
-    const cartListRef = useRef<HTMLUListElement>(null)
+    const cartListRef = useRef<HTMLDivElement>(null)
     const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [addingItem, setAddingItem] = useState<MenuItem | null>(null)
     const [checkoutOpen, setCheckoutOpen] = useState(false)
@@ -559,6 +560,27 @@ export default function POSPage() {
         )
     }, [categories])
 
+    /** `category_id → live item count` used to (a) show the count on
+     *  each category card and (b) hide categories with zero items
+     *  entirely from the strip. Driven by the same `items` source the
+     *  grid renders from, so a sold-out / branch-filtered menu auto-
+     *  hides categories that would have rendered an empty section. */
+    const itemCountByCategory = useMemo(() => {
+        const map = new Map<string, number>()
+        for (const it of items) {
+            if (!it.category_id) continue
+            map.set(it.category_id, (map.get(it.category_id) ?? 0) + 1)
+        }
+        return map
+    }, [items])
+
+    /** Categories that actually have items right now. The strip
+     *  renders these only — an empty category stays in the admin's
+     *  catalog but doesn't waste tile-space on the POS. */
+    const categoriesWithItems = useMemo(() => {
+        return sortedCategories.filter((c) => (itemCountByCategory.get(c.id) ?? 0) > 0)
+    }, [sortedCategories, itemCountByCategory])
+
     const visibleItems = useMemo(() => {
         let out = items
         if (activeCat !== "ALL") out = out.filter((i) => i.category_id === activeCat)
@@ -608,6 +630,33 @@ export default function POSPage() {
         return groups
     }, [items, sortedCategories, activeCat, search])
 
+    /** Cart lines grouped by category, in the same A→Z order as the
+     *  category strip. Keeps the original cart-array index on each line
+     *  so the existing qty/remove handlers (`changeQty(idx, delta)`)
+     *  still target the correct row when buttons live under a section
+     *  header. Lines whose item has no category fall into a synthesised
+     *  "Other" bucket at the end. */
+    const groupedCart = useMemo(() => {
+        type Group = { id: string | null; name: string; lines: { line: typeof cart[number]; idx: number }[] }
+        const byCat = new Map<string | null, Group>()
+        cart.forEach((line, idx) => {
+            const key = line.item.category_id ?? null
+            if (!byCat.has(key)) {
+                const name = key ? (categoryById.get(key)?.name ?? "Other") : "Other"
+                byCat.set(key, { id: key, name, lines: [] })
+            }
+            byCat.get(key)!.lines.push({ line, idx })
+        })
+        const out: Group[] = []
+        for (const c of sortedCategories) {
+            const g = byCat.get(c.id)
+            if (g) out.push(g)
+        }
+        const orphan = byCat.get(null)
+        if (orphan) out.push(orphan)
+        return out
+    }, [cart, sortedCategories, categoryById])
+
     /** Per-item total quantity in the cart. Drives the small "× N" badge
      *  on each menu tile so the cashier knows what's already added at a
      *  glance. Multiple cart lines for the same item (e.g. one plain +
@@ -635,7 +684,9 @@ export default function POSPage() {
      *  3:2 instead of 4:3) shortens each card by ~12% vertically so
      *  the denser grid doesn't trade horizontal density for too-tall
      *  rows. */
-    const ITEM_GRID_CLS = "grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+    // Reference-image grid: 4 columns at desktop width with comfortable
+    // gutters so each card has room for the image + name + ADD button.
+    const ITEM_GRID_CLS = "grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
 
     /** Renders one menu-tile card. Extracted so both the flat layout
      *  and the category-grouped layout reuse the exact same card
@@ -690,7 +741,7 @@ export default function POSPage() {
                         />
                     ) : (
                         <div className={cn(
-                            "absolute inset-0 grid place-items-center bg-gradient-to-br from-primary/10 via-card to-[hsl(var(--neon-magenta)/0.08)]",
+                            "absolute inset-0 grid place-items-center bg-primary/10",
                             it.is_sold_out && "grayscale",
                         )}>
                             <Utensils className="h-7 w-7 text-muted-foreground/40" />
@@ -713,14 +764,17 @@ export default function POSPage() {
                     )}
                 </div>
 
-                {/* Body: tighter padding + smaller fonts so each tile
-                 *  takes less vertical room on dense screens. */}
-                <div className="flex-1 flex flex-col p-2 gap-1.5">
+                {/* Body — name + price stacked, then a full-width ADD
+                 *  button pinned to the bottom (matches the reference
+                 *  design). When the item is already in the cart, the
+                 *  ADD button morphs into a stepper so cashiers can
+                 *  bump qty without re-opening the dialog. */}
+                <div className="flex-1 flex flex-col p-3 gap-2">
                     <div className="flex items-start gap-1.5">
                         <span
                             aria-label={it.food_type}
                             className={cn(
-                                "mt-0.5 h-2 w-2 rounded-sm shrink-0 border",
+                                "mt-1 h-2 w-2 rounded-sm shrink-0 border",
                                 it.food_type === "VEG" && "bg-success/80 border-success",
                                 it.food_type === "NON_VEG" && "bg-destructive/80 border-destructive",
                                 it.food_type === "EGG" && "bg-warning/80 border-warning",
@@ -728,83 +782,85 @@ export default function POSPage() {
                             )}
                         />
                         <span className={cn(
-                            "font-semibold text-[13px] leading-tight line-clamp-2 flex-1",
+                            "font-semibold text-sm leading-tight line-clamp-2 flex-1",
                             it.is_sold_out && "line-through opacity-60",
                         )}>
                             {it.name}
                         </span>
                     </div>
 
-                    <div className="flex items-end justify-between gap-2 mt-auto">
-                        <div className="leading-tight min-w-0">
-                            {sale != null ? (
-                                <>
-                                    <div className="text-sm font-bold text-primary tabular-nums">{money(sale)}</div>
-                                    <div className="text-[10px] text-muted-foreground line-through tabular-nums">{money(it.base_price)}</div>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="text-sm font-bold text-primary tabular-nums">{money(it.base_price)}</div>
-                                    <div className="text-[9px] text-muted-foreground">{cfg.taxShortName} {it.gst_slab}%</div>
-                                </>
-                            )}
-                        </div>
-                        {!it.is_sold_out && (
-                            inCartQty > 0 ? (
-                                <div
-                                    className="flex items-center gap-0.5 shrink-0"
-                                    onClick={(e) => e.stopPropagation()}
+                    <div className="leading-tight">
+                        {sale != null ? (
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="text-sm font-bold text-primary tabular-nums">{money(sale)}</span>
+                                <span className="text-[11px] text-muted-foreground line-through tabular-nums">{money(it.base_price)}</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="text-sm font-bold text-primary tabular-nums">{money(it.base_price)}</span>
+                                {it.gst_slab > 0 && (
+                                    <span className="text-[10px] text-muted-foreground">+ {cfg.taxShortName} {it.gst_slab}%</span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {!it.is_sold_out && (
+                        inCartQty > 0 ? (
+                            // In-cart: stepper bar pinned to the bottom
+                            // edge of the card. Touch-friendly height +
+                            // tabular qty so rapid tapping feels stable.
+                            <div
+                                className="mt-auto flex items-center justify-between gap-1 rounded-full bg-primary text-primary-foreground shadow-sm overflow-hidden"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); decreaseFromCard(it) }}
+                                    aria-label={`Decrease ${it.name} quantity`}
+                                    title={inCartQty === 1 ? "Remove" : "Decrease by 1"}
+                                    className="h-9 w-9 grid place-items-center hover:bg-primary-foreground/15 active:scale-95 transition-all"
                                 >
-                                    <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); decreaseFromCard(it) }}
-                                        aria-label={`Decrease ${it.name} quantity`}
-                                        title={inCartQty === 1 ? "Remove" : "Decrease by 1"}
-                                        className="h-7 w-7 rounded-lg grid place-items-center border border-border/60 bg-card hover:bg-accent active:scale-95 transition-all"
-                                    >
-                                        {inCartQty === 1
-                                            ? <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                            : <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />}
-                                    </button>
-                                    <span
-                                        className="min-w-[1.25rem] text-center text-sm font-bold tabular-nums"
-                                        aria-live="polite"
-                                    >
-                                        {inCartQty}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); addToCart(it) }}
-                                        aria-label={`Increase ${it.name} quantity`}
-                                        title="Add 1 more"
-                                        className={cn(
-                                            "h-7 w-7 rounded-lg grid place-items-center transition-all",
-                                            "bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))] text-primary-foreground",
-                                            "shadow-[0_2px_8px_-2px_hsl(var(--primary)/0.55)]",
-                                            "hover:scale-105 active:scale-95",
-                                        )}
-                                    >
-                                        <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                                    </button>
-                                </div>
-                            ) : (
+                                    {inCartQty === 1
+                                        ? <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+                                        : <Minus className="h-4 w-4" strokeWidth={2.5} />}
+                                </button>
+                                <span
+                                    className="flex-1 text-center text-sm font-bold tabular-nums"
+                                    aria-live="polite"
+                                >
+                                    {inCartQty} in cart
+                                </span>
                                 <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); addToCart(it) }}
-                                    aria-label={`Add ${it.name}`}
-                                    title="Tap to add 1 · Tap card to customise"
-                                    className={cn(
-                                        "h-8 w-8 rounded-lg grid place-items-center shrink-0 transition-all",
-                                        "bg-gradient-to-br from-primary to-[hsl(var(--neon-magenta))] text-primary-foreground",
-                                        "shadow-[0_3px_10px_-2px_hsl(var(--primary)/0.55)]",
-                                        "hover:scale-110 hover:shadow-[0_5px_14px_-2px_hsl(var(--primary)/0.7)] active:scale-95",
-                                    )}
+                                    aria-label={`Increase ${it.name} quantity`}
+                                    title="Add 1 more"
+                                    className="h-9 w-9 grid place-items-center hover:bg-primary-foreground/15 active:scale-95 transition-all"
                                 >
                                     <Plus className="h-4 w-4" strokeWidth={2.5} />
                                 </button>
-                            )
-                        )}
-                    </div>
+                            </div>
+                        ) : (
+                            // First add: full-width pill button so the
+                            // affordance reads as the card's primary CTA
+                            // — matches the reference image's "+  ADD".
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); addToCart(it) }}
+                                aria-label={`Add ${it.name}`}
+                                title="Tap to add 1 · Tap card to customise"
+                                className={cn(
+                                    "mt-auto h-9 w-full rounded-full flex items-center justify-center gap-1.5 transition-all",
+                                    "bg-primary text-primary-foreground font-semibold text-xs uppercase tracking-wider",
+                                    "shadow-sm hover:brightness-110 active:scale-[0.98]",
+                                )}
+                            >
+                                <Plus className="h-4 w-4" strokeWidth={2.5} />
+                                Add
+                            </button>
+                        )
+                    )}
                 </div>
             </div>
         )
@@ -860,8 +916,12 @@ export default function POSPage() {
         if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
         highlightTimerRef.current = setTimeout(() => setHighlightIdx(null), 1400)
         requestAnimationFrame(() => {
-            const ul = cartListRef.current
-            const li = ul?.children[idx] as HTMLElement | undefined
+            // Cart lines are now nested inside per-category sections,
+            // so children[idx] no longer maps 1:1 to row idx. Look up
+            // the row by its data-cart-idx attribute instead — same
+            // scroll-into-view behaviour, robust to the grouping.
+            const container = cartListRef.current
+            const li = container?.querySelector<HTMLElement>(`[data-cart-idx="${idx}"]`)
             li?.scrollIntoView({ behavior: "smooth", block: "nearest" })
         })
     }
@@ -2158,13 +2218,63 @@ export default function POSPage() {
     }
 
     return (
-        <div className="grid md:grid-cols-[1fr_340px] lg:grid-cols-[1fr_420px] gap-0 h-[calc(100vh-3.5rem)]">
+        <div className="grid grid-cols-[72px_1fr_360px] lg:grid-cols-[80px_1fr_420px] gap-0 h-dvh bg-background">
             <PageTour tourKey="pos" />
-            <section className="flex flex-col border-r border-border/40 min-w-0">
-                <div className="border-b border-border/40 p-4 flex flex-col gap-3">
+
+            {/* ── LEFT NAV RAIL ──────────────────────────────────────
+              * Vertical icon+label column anchored to the kiosk view.
+              * Each entry is a quick-jump into another POS surface;
+              * "Menu" is the active item (current view). The bottom
+              * action exits kiosk mode the same way the floating
+              * "Exit POS" pill does — kept for parity with the
+              * reference design's "Logout" slot but routed to the
+              * dashboard instead of signing out. */}
+            <nav className="flex flex-col items-stretch border-r border-border/40 bg-card/40 py-4">
+                <div className="flex flex-col items-stretch gap-1 px-2">
+                    <NavRailItem href="/pos"     icon={UtensilsCrossed} label="Menu"   active />
+                    <NavRailItem href="/tables"  icon={Grid3x3}         label="Tables"        />
+                    <NavRailItem href="/orders"  icon={Receipt}         label="Sales"         />
+                    <NavRailItem href="/bills"   icon={FileText}        label="Bills"         />
+                    <NavRailItem href="/settings" icon={SettingsIcon}   label="Settings"      />
+                    <NavRailItem href="/menu"    icon={HelpCircle}      label="Help"          />
+                </div>
+                <div className="mt-auto px-2">
+                    <button
+                        type="button"
+                        onClick={() => router.push("/dashboard")}
+                        className="w-full flex flex-col items-center gap-1 px-2 py-2.5 rounded-md text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                    >
+                        <LogOut className="h-4 w-4" />
+                        <span>Exit</span>
+                    </button>
+                </div>
+            </nav>
+
+            <section className="flex flex-col border-r border-border/40 min-w-0 min-h-0">
+                {/* ── TOP BAR — prominent search + compact context selectors
+                  * The reference image dedicates the top of the main column
+                  * to a big search input. Order type / table / source still
+                  * live here (they're essential for every sale) but get
+                  * pushed under the search as a thin secondary row so the
+                  * search itself reads as the primary affordance. */}
+                <div className="border-b border-border/40 p-4 space-y-3">
                     <div className="flex items-center gap-3">
+                        <div className="relative flex-1 max-w-xl">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search menu"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-9 h-10 rounded-full bg-muted/40 border-border/60 focus-visible:bg-background"
+                            />
+                        </div>
+                        <div className="ml-auto flex items-center gap-2">
+                            <TourReplayButton tourKey="pos" />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
                         <Tabs value={orderType} onValueChange={(v) => setOrderType(v as OrderType)}>
-                            <TabsList>
+                            <TabsList className="h-9">
                                 <TabsTrigger value="DINE_IN">Dine-in</TabsTrigger>
                                 <TabsTrigger value="TAKEAWAY">Takeaway</TabsTrigger>
                                 <TabsTrigger value="DELIVERY">Delivery</TabsTrigger>
@@ -2173,7 +2283,7 @@ export default function POSPage() {
                         </Tabs>
                         {orderType === "DINE_IN" && (
                             <Select value={tableNo || "__none__"} onValueChange={(v) => setTableNo(v === "__none__" ? "" : v)}>
-                                <SelectTrigger className="h-9 text-xs w-52" data-tour="pos-table-picker">
+                                <SelectTrigger className="h-9 text-xs w-44" data-tour="pos-table-picker">
                                     <SelectValue placeholder="Pick table" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -2214,7 +2324,7 @@ export default function POSPage() {
                         {/* Channel / source tag — Swiggy/Zomato options only render for
                          *  Indian tenants (those aggregators don't operate elsewhere). */}
                         <Select value={orderSource ?? "__none__"} onValueChange={(v) => setOrderSource(v === "__none__" ? null : v)}>
-                            <SelectTrigger className="h-9 text-xs w-36"><SelectValue placeholder="Direct" /></SelectTrigger>
+                            <SelectTrigger className="h-9 text-xs w-32"><SelectValue placeholder="Direct" /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="__none__">Direct</SelectItem>
                                 {cfg.code === "IN" && (
@@ -2228,36 +2338,116 @@ export default function POSPage() {
                                 <SelectItem value="OTHER">Other</SelectItem>
                             </SelectContent>
                         </Select>
-                        <div className="ml-auto flex items-center gap-1">
-                            <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="Search menu" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 w-56" />
-                            </div>
-                            <TourReplayButton tourKey="pos" />
+                    </div>
+                </div>
+
+                {/* ── CATEGORY STRIP — square cards with optional image + label
+                  * The reference dedicates a horizontal scroll-row of square
+                  * category tiles up here. We honour that: a horizontally-
+                  * scrolling row of `<CategoryTile>` cards. The "All" tile
+                  * is always first; remaining tiles come from the tenant's
+                  * `menu_categories`, each rendering its uploaded
+                  * `image_url` when set or a generic Utensils icon otherwise. */}
+                <div className="border-b border-border/40 px-4 py-3">
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-bold tracking-tight">Category</h3>
+                        <div className="flex items-center gap-1">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const el = document.getElementById("pos-cat-strip")
+                                    el?.scrollBy({ left: -220, behavior: "smooth" })
+                                }}
+                                className="h-7 w-7 grid place-items-center rounded-full border border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                                aria-label="Scroll categories left"
+                            >
+                                <ChevronLeft className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const el = document.getElementById("pos-cat-strip")
+                                    el?.scrollBy({ left: 220, behavior: "smooth" })
+                                }}
+                                className="h-7 w-7 grid place-items-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                                aria-label="Scroll categories right"
+                            >
+                                <ChevronRight className="h-3.5 w-3.5" />
+                            </button>
                         </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div id="pos-cat-strip" className="flex gap-2 overflow-x-auto scrollbar-thin pb-1 -mx-1 px-1">
                         <button
                             onClick={() => setActiveCat("ALL")}
                             className={cn(
-                                "px-3 py-1.5 rounded-md text-sm transition-colors",
-                                activeCat === "ALL" ? "bg-primary text-primary-foreground" : "bg-muted/40 text-muted-foreground hover:text-foreground",
+                                "relative shrink-0 w-[88px] h-[88px] rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-colors",
+                                activeCat === "ALL"
+                                    ? "border-primary ring-2 ring-primary/30 bg-primary/[0.06]"
+                                    : "border-border/60 bg-card hover:border-primary/40 hover:bg-muted/30",
                             )}
+                            title={`All items · ${items.length}`}
                         >
-                            All
-                        </button>
-                        {sortedCategories.map((c) => (
-                            <button
-                                key={c.id}
-                                onClick={() => setActiveCat(c.id)}
+                            <span
+                                aria-hidden
                                 className={cn(
-                                    "px-3 py-1.5 rounded-md text-sm transition-colors",
-                                    activeCat === c.id ? "bg-primary text-primary-foreground" : "bg-muted/40 text-muted-foreground hover:text-foreground",
+                                    "absolute top-1.5 right-1.5 min-w-[20px] h-5 px-1.5 rounded-full grid place-items-center text-[10px] font-bold tabular-nums border",
+                                    activeCat === "ALL"
+                                        ? "bg-primary text-primary-foreground border-primary"
+                                        : "bg-muted/70 text-muted-foreground border-border/60",
                                 )}
                             >
-                                {c.name}
-                            </button>
-                        ))}
+                                {items.length}
+                            </span>
+                            <div className="h-9 w-9 rounded-lg grid place-items-center bg-muted/50">
+                                <Utensils className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                            <span className="text-[11px] font-semibold">All</span>
+                        </button>
+                        {categoriesWithItems.map((c) => {
+                            const img = (c as { image_url?: string | null }).image_url ?? null
+                            const isActive = activeCat === c.id
+                            const count = itemCountByCategory.get(c.id) ?? 0
+                            return (
+                                <button
+                                    key={c.id}
+                                    onClick={() => setActiveCat(c.id)}
+                                    className={cn(
+                                        "relative shrink-0 w-[88px] h-[88px] rounded-xl border flex flex-col items-center justify-center gap-1.5 px-2 transition-colors",
+                                        isActive
+                                            ? "border-primary ring-2 ring-primary/30 bg-primary/[0.06]"
+                                            : "border-border/60 bg-card hover:border-primary/40 hover:bg-muted/30",
+                                    )}
+                                    title={`${c.name} · ${count} item${count === 1 ? "" : "s"}`}
+                                >
+                                    {/* Count pip — top-right corner. Primary tint
+                                      * when the category is the active filter so it
+                                      * reads as "you have N of these", neutral grey
+                                      * otherwise. */}
+                                    <span
+                                        aria-hidden
+                                        className={cn(
+                                            "absolute top-1.5 right-1.5 min-w-[20px] h-5 px-1.5 rounded-full grid place-items-center text-[10px] font-bold tabular-nums border",
+                                            isActive
+                                                ? "bg-primary text-primary-foreground border-primary"
+                                                : "bg-muted/70 text-muted-foreground border-border/60",
+                                        )}
+                                    >
+                                        {count}
+                                    </span>
+                                    {img ? (
+                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                        <img src={img} alt="" className="h-9 w-9 rounded-lg object-cover" />
+                                    ) : (
+                                        <div className="h-9 w-9 rounded-lg grid place-items-center bg-muted/50">
+                                            <Utensils className="h-4 w-4 text-muted-foreground" />
+                                        </div>
+                                    )}
+                                    <span className="text-[11px] font-semibold leading-tight text-center line-clamp-2 break-words">
+                                        {c.name}
+                                    </span>
+                                </button>
+                            )
+                        })}
                     </div>
                 </div>
 
@@ -2305,23 +2495,48 @@ export default function POSPage() {
                     ) : groupedByCategory ? (
                         // ── "All" with no search → category-grouped layout.
                         // Section header pinned on scroll so the cashier
-                        // always knows which group they're looking at.
-                        <div className="space-y-5">
-                            {groupedByCategory.map((group) => (
-                                <section key={group.id ?? "_orphan"}>
-                                    <header className="sticky top-0 z-10 -mx-4 px-4 py-1.5 bg-background/95 backdrop-blur border-b border-border/40 mb-2.5 flex items-center gap-2">
-                                        <h3 className="text-[11px] font-bold uppercase tracking-wider text-foreground/80">
-                                            {group.name}
-                                        </h3>
-                                        <span className="text-[10px] text-muted-foreground tabular-nums">
-                                            {group.items.length}
-                                        </span>
-                                    </header>
-                                    <div className={ITEM_GRID_CLS}>
-                                        {group.items.map(renderItemCard)}
-                                    </div>
-                                </section>
-                            ))}
+                        // always knows which group they're scrolling
+                        // through. Header design mirrors the square
+                        // category-strip tiles up top (image / icon +
+                        // bold name + count badge) so the two surfaces
+                        // read as one consistent visual system.
+                        <div className="space-y-6">
+                            {groupedByCategory.map((group) => {
+                                const groupCat = group.id ? categoryById.get(group.id) : null
+                                const groupImg = (groupCat as { image_url?: string | null } | null)?.image_url ?? null
+                                return (
+                                    <section key={group.id ?? "_orphan"}>
+                                        <header className="sticky top-0 z-10 -mx-4 px-4 py-2.5 mb-3 bg-background/95 backdrop-blur-md border-b border-border/60 flex items-center gap-3 shadow-sm">
+                                            {groupImg ? (
+                                                /* eslint-disable-next-line @next/next/no-img-element */
+                                                <img
+                                                    src={groupImg}
+                                                    alt=""
+                                                    className="h-9 w-9 rounded-lg object-cover shrink-0 ring-1 ring-border/60"
+                                                />
+                                            ) : (
+                                                <div className="h-9 w-9 rounded-lg grid place-items-center shrink-0 bg-primary/10 ring-1 ring-primary/20">
+                                                    <Utensils className="h-4 w-4 text-primary" />
+                                                </div>
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-base font-bold tracking-tight truncate leading-tight">
+                                                    {group.name}
+                                                </h3>
+                                                <p className="text-[11px] text-muted-foreground tabular-nums">
+                                                    {group.items.length} {group.items.length === 1 ? "item" : "items"}
+                                                </p>
+                                            </div>
+                                            <Badge variant="outline" className="text-[10px] shrink-0 uppercase tracking-wider">
+                                                {group.items.length}
+                                            </Badge>
+                                        </header>
+                                        <div className={ITEM_GRID_CLS}>
+                                            {group.items.map(renderItemCard)}
+                                        </div>
+                                    </section>
+                                )
+                            })}
                         </div>
                     ) : (
                         // Filtered (by category chip) or searching → flat
@@ -2334,61 +2549,69 @@ export default function POSPage() {
                 </div>
             </section>
 
-            <aside className="flex flex-col bg-card/40 backdrop-blur-xl" data-tour="pos-cart">
+            {/* `min-h-0` is the magic flex-bug fix: without it the
+              * inner `flex-1 overflow-auto` cart list expands to fit
+              * every line and pushes the totals + Charge button below
+              * the viewport on long orders. With it, the cart scrolls
+              * cleanly and the action bar stays pinned at the bottom. */}
+            <aside className="flex flex-col bg-card min-h-0" data-tour="pos-cart">
+                {/* ── Order Details header ────────────────────────────
+                  * The reference dedicates a generous heading area to
+                  * the order context: title + customer block + a small
+                  * action-icon row. We keep the customer phone-lookup
+                  * affordance and the customer-screen controls but
+                  * present them as a compact set of icon buttons that
+                  * sit beside the customer card rather than dominating
+                  * the panel like the old "Cart" header did. */}
                 <div className="border-b border-border/40 p-4 space-y-3">
                     <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                            <h2 className="font-semibold">Cart</h2>
-                            <p className="text-xs text-muted-foreground">{cart.length} item(s)</p>
+                            <h2 className="text-lg font-bold tracking-tight">Order Details</h2>
+                            <p className="text-xs text-muted-foreground">
+                                {cart.length} item{cart.length === 1 ? "" : "s"}
+                                {tableNo && tableNo !== "__waiting__" && <> · Table <span className="font-mono">{tableNo}</span></>}
+                            </p>
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => { setCart([]); removeCoupon(); setCustomer(null); setCustomerPhone("") }} disabled={cart.length === 0 && !customer}>Clear</Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => { setCart([]); removeCoupon(); setCustomer(null); setCustomerPhone("") }}
+                            disabled={cart.length === 0 && !customer}
+                        >
+                            Clear
+                        </Button>
                     </div>
 
-                    {/* ── Customer screen control ─────────────────────────
-                      * Always visible so the cashier can (a) OPEN their
-                      * own customer-facing display — the URL is fetched
-                      * for whoever is logged in, so it's never the wrong
-                      * staff member's screen — and (b) force a RE-SYNC
-                      * if the screen ever looks out of date. */}
-                    <div className="flex items-center gap-1.5 rounded-lg border border-border/50 bg-background/40 px-2.5 py-2">
-                        <MonitorSmartphone className="h-4 w-4 text-primary shrink-0" />
-                        <span className="text-xs font-medium text-muted-foreground mr-auto">Customer screen</span>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={openCustomerScreen}
-                            disabled={openingScreen}
-                            title="Open this counter's customer-facing display in a new tab"
-                        >
-                            {openingScreen
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <ExternalLink className="h-3.5 w-3.5" />}
-                            Open
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={resyncDisplay}
-                            disabled={resyncing}
-                            title="Wipe the saved display data and re-push this cart"
-                        >
-                            {resyncing
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <RefreshCw className="h-3.5 w-3.5" />}
-                            Re-sync
-                        </Button>
-                    </div>
                     {customer ? (
-                        <div className="flex items-center justify-between gap-2 rounded-md bg-primary/10 border border-primary/30 px-3 py-2 text-sm">
-                            <div className="min-w-0">
-                                <div className="font-medium truncate">{customer.name ?? customerPhone}</div>
-                                <div className="text-xs text-muted-foreground">
+                        // Resolved customer: avatar (two-letter initial),
+                        // name, loyalty info, dismiss-X. Matches the
+                        // reference's customer-block header where the
+                        // person is the most prominent thing on the
+                        // panel after the title.
+                        <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/[0.06] px-3 py-2.5">
+                            <span
+                                aria-hidden
+                                className="h-10 w-10 rounded-full grid place-items-center shrink-0 text-sm font-bold bg-primary text-primary-foreground"
+                            >
+                                {((customer.name ?? customerPhone) || "?")
+                                    .split(/\s+/).filter(Boolean).slice(0, 2)
+                                    .map((w) => w[0]?.toUpperCase() ?? "")
+                                    .join("") || "?"}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                                <div className="font-semibold truncate">{customer.name ?? customerPhone}</div>
+                                <div className="text-[11px] text-muted-foreground truncate">
                                     {customer.loyalty_tier} · {customer.loyalty_points} pts
+                                    {customerPhone && <> · {customerPhone}</>}
                                 </div>
                             </div>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setCustomer(null); setCustomerPhone("") }}>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 shrink-0"
+                                onClick={() => { setCustomer(null); setCustomerPhone("") }}
+                                aria-label="Remove customer"
+                            >
                                 <X className="h-3.5 w-3.5" />
                             </Button>
                         </div>
@@ -2403,13 +2626,6 @@ export default function POSPage() {
                                         className="h-9 pr-8"
                                         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), lookupCustomer())}
                                     />
-                                    {/* Inline loader pinned to the right edge of
-                                      * the input — runs only while the debounced
-                                      * auto-lookup is fetching. The 400ms
-                                      * debounce + read-only nature of the lookup
-                                      * means the loader only flashes once per
-                                      * stable phone number, not on every
-                                      * keystroke. */}
                                     {customerLookupBusy && (
                                         <Loader2
                                             className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground"
@@ -2433,49 +2649,148 @@ export default function POSPage() {
                             )}
                         </div>
                     )}
+
+                    {/* Action-icon row — small affordances for the
+                      * customer-facing screen + a coupon entry trigger.
+                      * Compact so they don't compete with the customer
+                      * block above. Each icon has a clear title. */}
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={openCustomerScreen}
+                            disabled={openingScreen}
+                            title="Open customer-facing display in a new tab"
+                            aria-label="Open customer screen"
+                        >
+                            {openingScreen
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <MonitorSmartphone className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={resyncDisplay}
+                            disabled={resyncing}
+                            title="Re-sync customer screen"
+                            aria-label="Re-sync customer screen"
+                        >
+                            {resyncing
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <RefreshCw className="h-3.5 w-3.5" />}
+                        </Button>
+                        <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wider">
+                            {orderType.replace("_", " ")}
+                        </span>
+                    </div>
                 </div>
 
-                <div className="flex-1 overflow-auto scrollbar-thin">
+                <div ref={cartListRef} className="flex-1 overflow-auto scrollbar-thin">
                     {cart.length === 0 ? (
                         <div className="text-center text-sm text-muted-foreground py-20 px-4">
                             Tap menu items to add them to the cart.
                         </div>
                     ) : (
-                        <ul ref={cartListRef} className="divide-y divide-border/40">
-                            {cart.map((c, i) => (
-                                <li
-                                    key={i}
-                                    className={cn(
-                                        "p-3 flex items-center gap-3 transition-colors duration-500",
-                                        highlightIdx === i && "bg-primary/15 ring-1 ring-primary/40",
-                                    )}
-                                >
-                                    <div className="flex-1 min-w-0">
-                                        <div className="font-medium truncate">{c.item.name}</div>
-                                        <div className="text-xs text-muted-foreground">
-                                            {money(effectivePrice(c.item))} × {c.quantity} ·{" "}
-                                            {c.item.sale_price != null && Number(c.item.sale_price) < Number(c.item.base_price) && (
-                                                <span className="line-through text-muted-foreground/60 mr-1">{money(c.item.base_price)}</span>
-                                            )}
-                                            <span>{cfg.taxShortName} {c.item.gst_slab}%</span>
-                                        </div>
-                                        {c.notes && <div className="text-xs italic text-amber-500 truncate">⤷ {c.notes}</div>}
+                        // Cart lines grouped by category, with a small
+                        // pill-style section label per group — matches the
+                        // reference's "Appetizer / Main Course / Dessert"
+                        // banners. The section header is `sticky` inside
+                        // the scroll container so on long orders the
+                        // cashier always knows which group they're
+                        // scanning through as they scroll.
+                        <div className="divide-y divide-border/40">
+                            {groupedCart.map((group) => (
+                                <section key={group.id ?? "_other"} className="py-2">
+                                    <div className="sticky top-0 z-10 px-4 pt-1.5 pb-1 bg-card/95 backdrop-blur-sm">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold uppercase tracking-wider">
+                                            {group.name}
+                                        </span>
                                     </div>
-                                    <div className="flex items-center gap-1">
-                                        <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => changeQty(i, -1)}>
-                                            <Minus className="h-3.5 w-3.5" />
-                                        </Button>
-                                        <span className="w-7 text-center text-sm font-medium">{c.quantity}</span>
-                                        <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => changeQty(i, 1)}>
-                                            <Plus className="h-3.5 w-3.5" />
-                                        </Button>
-                                    </div>
-                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => changeQty(i, -c.quantity)}>
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                </li>
+                                    <ul>
+                                        {group.lines.map(({ line: c, idx: i }) => {
+                                            const isOnSale = c.item.sale_price != null && Number(c.item.sale_price) < Number(c.item.base_price)
+                                            return (
+                                                <li
+                                                    key={i}
+                                                    data-cart-idx={i}
+                                                    className={cn(
+                                                        "px-4 py-2 flex items-start gap-3 transition-colors duration-500",
+                                                        highlightIdx === i && "bg-primary/15 ring-1 ring-primary/40",
+                                                    )}
+                                                >
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-baseline gap-2">
+                                                            <span className="font-semibold text-sm truncate flex-1">{c.item.name}</span>
+                                                            <span className="text-sm font-bold tabular-nums shrink-0">
+                                                                {money(effectivePrice(c.item) * c.quantity)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-[11px] text-muted-foreground">
+                                                            {money(effectivePrice(c.item))} × {c.quantity}
+                                                            {isOnSale && (
+                                                                <span className="line-through text-muted-foreground/60 ml-1">
+                                                                    {money(c.item.base_price)}
+                                                                </span>
+                                                            )}
+                                                            {c.item.gst_slab > 0 && (
+                                                                <span className="ml-1.5">· {cfg.taxShortName} {c.item.gst_slab}%</span>
+                                                            )}
+                                                        </div>
+                                                        {/* Modifier note pill — reference design uses
+                                                          * coloured capsules ("No Shrimp" red, "Extra
+                                                          * Chicken" green, etc.). We render notes as
+                                                          * neutral pills since they're user-typed
+                                                          * free text, not structured negative/positive. */}
+                                                        {c.notes && (
+                                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                                {c.notes.split(/[,;\n]+/).map((tag, k) => {
+                                                                    const t = tag.trim()
+                                                                    if (!t) return null
+                                                                    const isNegative = /^no\s|without\s|less\s|skip\s/i.test(t)
+                                                                    return (
+                                                                        <span
+                                                                            key={k}
+                                                                            className={cn(
+                                                                                "inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border",
+                                                                                isNegative
+                                                                                    ? "bg-destructive/10 text-destructive border-destructive/30"
+                                                                                    : "bg-success/10 text-success border-success/30",
+                                                                            )}
+                                                                        >
+                                                                            {t}
+                                                                        </span>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                        <div className="mt-1.5 inline-flex items-center gap-1">
+                                                            <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => changeQty(i, -1)}>
+                                                                <Minus className="h-3 w-3" />
+                                                            </Button>
+                                                            <span className="w-6 text-center text-xs font-bold tabular-nums">{c.quantity}</span>
+                                                            <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => changeQty(i, 1)}>
+                                                                <Plus className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                className="h-6 w-6 ml-1 text-destructive"
+                                                                onClick={() => changeQty(i, -c.quantity)}
+                                                                title="Remove"
+                                                            >
+                                                                <Trash2 className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </li>
+                                            )
+                                        })}
+                                    </ul>
+                                </section>
                             ))}
-                        </ul>
+                        </div>
                     )}
                 </div>
 
@@ -2502,7 +2817,7 @@ export default function POSPage() {
                 )}
 
                 {totals && (
-                    <div className="border-t border-border/40 p-4 space-y-2 text-sm">
+                    <div className="border-t border-border/40 p-4 space-y-2.5 text-sm">
                         {appliedCoupon ? (
                             <div className="flex items-center justify-between gap-2 rounded-md bg-success/10 border border-success/30 px-3 py-2">
                                 <div className="flex items-center gap-2 min-w-0">
@@ -2533,9 +2848,19 @@ export default function POSPage() {
                                 </Button>
                             </div>
                         )}
-                        <Row label="Subtotal" value={money(totals.subtotal)} />
-                        {totals.order_discount > 0 && (
-                            <Row label="Coupon discount" value={`- ${money(totals.order_discount)}`} className="text-success" />
+                        {/* Totals — reference design uses tight rows with
+                          * dimmed labels, bold values. Tax lines roll into a
+                          * single "Tax" label when the cashier doesn't need
+                          * a CGST/SGST/IGST breakdown (i.e. non-India
+                          * tenants). */}
+                        <Row label="Sub Total" value={money(totals.subtotal)} />
+                        <Row
+                            label="Discount"
+                            value={totals.order_discount > 0 ? `- ${money(totals.order_discount)}` : money(0)}
+                            className={totals.order_discount > 0 ? "text-success" : ""}
+                        />
+                        {cfg.serviceChargeAllowed && (
+                            <Row label="Service Charge" value={money(totals.service_charge)} />
                         )}
                         {cfg.taxModel === "split" ? (
                             <>
@@ -2544,48 +2869,76 @@ export default function POSPage() {
                                 {totals.igst_amount > 0 && <Row label={cfg.taxLabels.igst ?? "IGST"} value={money(totals.igst_amount)} />}
                             </>
                         ) : (
-                            // Single combined tax lands in the IGST slot — relabel it per the country.
-                            totals.igst_amount > 0 && <Row label={cfg.taxLabels.single ?? cfg.taxShortName} value={money(totals.igst_amount)} />
+                            <Row label="Tax" value={money(totals.igst_amount ?? 0)} />
                         )}
-                        {totals.service_charge > 0 && <Row label="Service charge" value={money(totals.service_charge)} />}
                         {totals.round_off !== 0 && <Row label="Round off" value={money(totals.round_off)} />}
                         {!cfg.serviceChargeAllowed && rawServiceChargePct > 0 && (
                             <div className="text-[10px] text-warning">Service charge isn&apos;t allowed in {cfg.name} — it&apos;s been left off this bill.</div>
                         )}
-                        <div className="border-t border-border/40 pt-2 mt-2">
-                            <Row label="Grand total" value={money(totals.grand_total)} className="text-lg font-bold" />
+                        <div className="border-t border-border/60 pt-2 mt-1 flex items-baseline justify-between">
+                            <span className="text-base font-bold">Total</span>
+                            <span className="text-xl font-bold tabular-nums">{money(totals.grand_total)}</span>
                         </div>
                     </div>
                 )}
 
+                {/* ── Action buttons — Print / Fire / Charge ──
+                  * The reference layout: two outline-style buttons on the
+                  * top row (Print + the kitchen "Fire"), then a full-
+                  * width primary "Charge $XX.XX" CTA below. We map them:
+                  *   Print   → window.print() (basic, for now)
+                  *   Fire    → Send KOT (dine-in + table only) OR Send-to-
+                  *             kitchen-and-bill for pay-first dine-in
+                  *   Charge  → Review & checkout dialog (existing path) */}
                 <div className="border-t border-border/40 p-4 space-y-2">
-                    {/* For dine-in flow: send the current cart to the kitchen
-                     *  as a KOT and keep the table open. The waiter can add
-                     *  more items later and send another KOT — all of them
-                     *  consolidate into a single bill when the customer asks
-                     *  for it. For takeaway / delivery / QSR we skip KOT and
-                     *  go straight to checkout. */}
                     {orderType === "DINE_IN" && tableNo && (
-                        <>
-                            <Button variant="outline" className="w-full" size="lg" disabled={cart.length === 0 || busy} onClick={() => sendKot()} data-tour="pos-send-kot">
-                                <Utensils className="h-4 w-4" />
-                                Send KOT to kitchen{cart.length ? ` (${cart.reduce((s, c) => s + c.quantity, 0)} item${cart.length === 1 ? "" : "s"})` : ""}
-                            </Button>
-                            {/* Pay-first dine-in — sends the KOT AND opens
-                              * the checkout dialog so the customer pays
-                              * before the food lands. Same atomic bill +
-                              * payment contract as takeaway/QSR; the only
-                              * difference is the KOT goes to the kitchen
-                              * (vs takeaway/QSR which skip the KDS). */}
-                            <Button variant="outline" className="w-full" size="lg" disabled={cart.length === 0 || busy} onClick={sendKotThenBill}>
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button
+                                variant="outline"
+                                size="lg"
+                                onClick={() => window.print()}
+                                disabled={cart.length === 0}
+                                title="Print the current cart as a paper docket"
+                            >
                                 <Receipt className="h-4 w-4" />
-                                Send to kitchen + Bill now{totals ? ` — ${money(totals.grand_total)}` : ""}
+                                Print
                             </Button>
-                        </>
+                            <Button
+                                variant="warning"
+                                size="lg"
+                                disabled={cart.length === 0 || busy}
+                                onClick={() => sendKot()}
+                                data-tour="pos-send-kot"
+                                title="Send the current cart to the kitchen (KOT)"
+                            >
+                                <Utensils className="h-4 w-4" />
+                                Fire
+                            </Button>
+                        </div>
                     )}
-                    <Button variant="neon" className="w-full" size="lg" disabled={cart.length === 0 || busy} onClick={() => setCheckoutOpen(true)} data-tour="pos-checkout">
+                    {orderType === "DINE_IN" && tableNo && (
+                        <Button
+                            variant="outline"
+                            className="w-full"
+                            size="lg"
+                            disabled={cart.length === 0 || busy}
+                            onClick={sendKotThenBill}
+                            title="Send the KOT to the kitchen AND open checkout (pay-first dine-in)"
+                        >
+                            <Receipt className="h-4 w-4" />
+                            Fire + Bill now
+                        </Button>
+                    )}
+                    <Button
+                        variant="neon"
+                        className="w-full"
+                        size="lg"
+                        disabled={cart.length === 0 || busy}
+                        onClick={() => setCheckoutOpen(true)}
+                        data-tour="pos-checkout"
+                    >
                         <Receipt className="h-4 w-4" />
-                        Review &amp; checkout{totals ? ` — ${money(totals.grand_total)}` : ""}
+                        Charge{totals ? ` ${money(totals.grand_total)}` : ""}
                     </Button>
                 </div>
             </aside>
@@ -2709,5 +3062,33 @@ function Row({ label, value, className }: { label: string; value: string; classN
             <span className="text-muted-foreground">{label}</span>
             <span className="font-medium">{value}</span>
         </div>
+    )
+}
+
+/** Single entry in the POS left navigation rail. Icon stacked over a
+ *  small label, active entry tinted with the primary accent so the
+ *  cashier instantly sees where they are. */
+function NavRailItem({
+    href, icon: Icon, label, active = false,
+}: {
+    href: string
+    icon: React.ComponentType<{ className?: string }>
+    label: string
+    active?: boolean
+}) {
+    return (
+        <Link
+            href={href}
+            className={cn(
+                "flex flex-col items-center gap-1 px-2 py-2.5 rounded-md text-[10px] uppercase tracking-wider transition-colors",
+                active
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
+            )}
+            title={label}
+        >
+            <Icon className="h-4 w-4" />
+            <span>{label}</span>
+        </Link>
     )
 }

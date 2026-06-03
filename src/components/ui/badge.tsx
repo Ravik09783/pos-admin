@@ -13,7 +13,11 @@ const badgeVariants = cva(
                 success: "border-transparent bg-success/15 text-success",
                 warning: "border-transparent bg-warning/15 text-warning",
                 outline: "border-border text-foreground",
-                neon: "border-transparent bg-gradient-to-r from-primary/20 to-[hsl(var(--neon-magenta)/0.2)] text-primary",
+                // Flat primary chip — was a primary→magenta gradient.
+                // Aligned with the rest of the system's gradient-free
+                // look so "neon"-variant badges no longer stand out
+                // as a different visual language from the others.
+                neon: "border-transparent bg-primary/15 text-primary",
             },
         },
         defaultVariants: { variant: "default" },

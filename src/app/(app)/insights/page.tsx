@@ -207,7 +207,7 @@ export default function InsightsPage() {
                 <div className="absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-[hsl(var(--neon-magenta)/0.2)] blur-3xl pointer-events-none" />
                 <div className="relative p-6 md:p-8 flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-4">
-                        <div className="grid place-items-center h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta)/0.25)] shrink-0">
+                        <div className="grid place-items-center h-14 w-14 rounded-2xl bg-primary/15 shrink-0">
                             <Brain className="h-7 w-7 text-primary" />
                         </div>
                         <div>
@@ -232,7 +232,7 @@ export default function InsightsPage() {
                     transition={{ delay: 0.1, duration: 0.5 }}
                     className="rounded-2xl glass-strong border border-border/50 neon-border p-12 text-center"
                 >
-                    <div className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-gradient-to-br from-success/25 to-primary/25 mb-4">
+                    <div className="mx-auto grid place-items-center h-16 w-16 rounded-full bg-primary/15 mb-4">
                         <CheckCircle2 className="h-7 w-7 text-success" />
                     </div>
                     <h2 className="text-xl md:text-2xl font-bold tracking-tight">

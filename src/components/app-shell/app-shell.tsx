@@ -5,7 +5,9 @@ import { usePathname, useRouter } from "next/navigation"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { AppFooter } from "./app-footer"
 import { BillingBanner } from "./billing-banner"
+import { CommandPalette } from "./command-palette"
 import { PlanOverageBanner } from "./plan-overage-banner"
 import { Topbar } from "./topbar"
 import type { UserRole } from "@/types/database"
@@ -98,6 +100,11 @@ export function AppShell(props: AppShellProps) {
                     <X className="h-3.5 w-3.5" />
                     Exit POS
                 </button>
+
+                {/* Global command palette — accessible from kiosk too
+                  * (⌘K / Ctrl+K / "/") so a cashier in POS can jump
+                  * to any other surface without exiting kiosk first. */}
+                <CommandPalette role={props.role} />
             </div>
         )
     }
@@ -134,6 +141,16 @@ export function AppShell(props: AppShellProps) {
               * branches or staff than their tier covers. OWNER-only. */}
             <PlanOverageBanner role={props.role} />
             <main className="flex-1 min-h-0 overflow-auto scrollbar-thin">{props.children}</main>
+            {/* Thin footer pinned below main — hosts the theme picker
+              * and other low-frequency controls. shrink-0 keeps the
+              * height fixed so it doesn't compete with main's
+              * flex-1. */}
+            <AppFooter />
+
+            {/* Global command palette — ⌘K / Ctrl+K / "/" opens it
+              * from anywhere. Mounted once at the shell level so a
+              * single keyboard listener serves every page. */}
+            <CommandPalette role={props.role} />
         </div>
     )
 }

@@ -78,6 +78,52 @@
      * Source order matters: these come AFTER `:root, .dark` and `.light` so
      * equal-specificity attribute selectors win. */
 
+    /* ── Atelier — premium light theme · cream + deep emerald ─────────────
+     * The visual language of luxury hospitality (Aman, Soho House,
+     * fine-dining POS hardware): a warm ivory canvas, pure-white
+     * floating cards, and a deep forest-emerald accent. Reads as
+     * sophisticated and inviting at the same time — cream backgrounds
+     * let food photography pop the way pure-white can't, and the
+     * deep green money-positive accent doubles as a "confirm" colour
+     * without competing with destructive red. All `--neon-*`
+     * variables point at the same emerald so any gradient utility
+     * flattens to a single colour. */
+    html[data-theme="atelier"] {
+        --background: 40 30% 97%;            /* warm ivory canvas */
+        --foreground: 220 18% 12%;           /* deep slate text */
+        --card: 0 0% 100%;                   /* pure-white floating cards */
+        --card-foreground: 220 18% 12%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 220 18% 12%;
+        --primary: 158 65% 28%;              /* deep forest emerald */
+        --primary-foreground: 0 0% 100%;
+        --secondary: 40 18% 92%;             /* warm beige */
+        --secondary-foreground: 220 18% 12%;
+        --muted: 40 15% 94%;                 /* paler warm cream */
+        --muted-foreground: 220 9% 46%;      /* warm slate */
+        --accent: 40 18% 91%;
+        --accent-foreground: 220 18% 12%;
+        --destructive: 0 70% 47%;            /* deep restrained red */
+        --destructive-foreground: 0 0% 100%;
+        --success: 158 60% 35%;              /* emerald sibling of primary */
+        --success-foreground: 0 0% 100%;
+        --warning: 32 90% 48%;               /* warm amber */
+        --warning-foreground: 0 0% 100%;
+        --border: 40 14% 88%;                /* subtle warm-tinted hairline */
+        --input: 40 14% 88%;
+        --ring: 158 65% 28%;
+        /* All four neon-* point at primary so multi-stop gradient
+         * utilities scattered across the codebase render as flat
+         * emerald in this theme rather than rainbow stripes. */
+        --neon-cyan:    158 65% 28%;
+        --neon-magenta: 158 65% 28%;
+        --neon-lime:    158 65% 28%;
+        --neon-amber:   158 65% 28%;
+        /* Slightly tighter corners than the neon default — luxury
+         * UI tends toward moderate radius, not aggressive rounding. */
+        --radius: 0.5rem;
+    }
+
     html[data-theme="daylight"] {
         --background: 0 0% 100%;
         --foreground: 222 47% 11%;
@@ -864,9 +910,11 @@
         font-feature-settings: "cv11", "ss01", "ss03";
     }
     body {
-        background-image:
-            radial-gradient(ellipse 80% 50% at 50% -20%, hsl(var(--neon-cyan) / 0.10), transparent 60%),
-            radial-gradient(ellipse 60% 50% at 90% 110%, hsl(var(--neon-magenta) / 0.08), transparent 60%);
+        /* The page used to carry a top-and-bottom radial colour wash
+         * (cyan top, magenta bottom). The new design system is flat
+         * across every theme, so the body stays the solid background
+         * colour with no ambient gradient. Themes still recolour the
+         * canvas via `--background`, just without the wash. */
         background-attachment: fixed;
     }
     /* Every semantic heading uses DM Sans — the entire UI is one
@@ -885,25 +933,36 @@
 }
 
 @layer components {
+    /* Surface utilities — flat by design.
+     *
+     * `.glass` / `.glass-strong` used to do frosted backdrop-blur with
+     * a translucent fill (`bg-card/60` + `backdrop-blur-xl`). The new
+     * design system is gradient + glass free, so both classes now
+     * render as a SOLID card surface with a hairline border — the look
+     * of the reference POS UI. Existing callers don't need to change. */
     .glass {
-        @apply bg-card/60 backdrop-blur-xl border border-border/60;
+        @apply bg-card border border-border/60;
     }
     .glass-strong {
-        @apply bg-card/80 backdrop-blur-2xl border border-border;
+        @apply bg-card border border-border;
     }
+    /* `.neon-border` was a cyan-tinted glow ring + soft outer halo.
+     * Replaced with a clean single-line border plus a low-tone drop
+     * shadow so cards still lift off the background without the
+     * coloured neon halo. */
     .neon-border {
         box-shadow:
             0 0 0 1px hsl(var(--border)),
-            inset 0 1px 0 0 hsl(var(--neon-cyan) / 0.06),
-            0 8px 30px -10px hsl(var(--neon-cyan) / 0.25);
+            0 1px 2px 0 hsl(0 0% 0% / 0.05);
     }
-    .text-gradient {
-        @apply bg-clip-text text-transparent;
-        background-image: linear-gradient(120deg, hsl(var(--neon-cyan)), hsl(var(--neon-magenta)));
-    }
+    /* `.text-gradient` / `.text-gradient-warm` used to clip a
+     * cyan→magenta sweep onto text. The new design favours single-
+     * colour accent text, so both classes now resolve to the
+     * theme's primary colour. Existing callers (marketing headlines,
+     * etc.) keep their accent emphasis without the rainbow text. */
+    .text-gradient,
     .text-gradient-warm {
-        @apply bg-clip-text text-transparent;
-        background-image: linear-gradient(120deg, hsl(var(--neon-amber)), hsl(var(--neon-magenta)));
+        @apply text-primary;
     }
 
     /* ── POS Pro per-theme component overrides ────────────────────────

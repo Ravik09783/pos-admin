@@ -210,7 +210,7 @@ export default function CaExportPage() {
                         <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-primary/15 blur-3xl pointer-events-none" />
                         <div className="relative p-6 md:p-8 flex flex-wrap items-center gap-4 justify-between">
                             <div className="flex items-center gap-4 min-w-0">
-                                <div className="grid place-items-center h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/25 to-[hsl(var(--neon-magenta)/0.25)] shrink-0">
+                                <div className="grid place-items-center h-14 w-14 rounded-2xl bg-primary/15 shrink-0">
                                     <Package className="h-7 w-7 text-primary" />
                                 </div>
                                 <div className="min-w-0">
