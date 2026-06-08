@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { getCurrentUserAndTenant } from "@/lib/auth/current-user"
 import { MenuCards } from "@/components/app-shell/menu-cards"
 import { PageHeader } from "@/components/app-shell/page-header"
+import { SelfPunchCard } from "@/components/hr/self-punch-card"
 
 /**
  * /menu — the app launcher.
@@ -36,6 +37,10 @@ export default async function MenuLauncherPage() {
                 highlight="what's next?"
                 description="Your most-used tools are pinned up top. Everything else is grouped below."
             />
+            {/* Self-service time clock — pinned at the top so a linked employee
+              * can punch in/out in one tap without scrolling. Renders nothing
+              * for users not linked to an hr_employees row (see component). */}
+            <SelfPunchCard />
             <MenuCards />
         </div>
     )

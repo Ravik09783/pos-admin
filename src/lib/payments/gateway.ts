@@ -36,7 +36,7 @@
 import { getTaxConfig } from "@/lib/tax/locale-config"
 
 /** What we route a given transaction through. */
-export type PaymentGateway = "phonepe" | "stripe" | "manual"
+export type PaymentGateway = "phonepe" | "paytm" | "stripe" | "manual"
 
 /**
  * The gateway a restaurant in this country should use by default.
@@ -64,11 +64,16 @@ export function resolveGateway(
     adminChoice: string | null | undefined,
 ): PaymentGateway {
     const def = getGatewayForCountry(country)
-    // Indian restaurants can override PhonePe → manual; everyone else
-    // gets the auto-determined gateway regardless of what's in the
-    // column. This prevents accidental misconfiguration (e.g. a UK
-    // restaurant flipping to "phonepe" — PhonePe is India-only).
-    if (def === "phonepe" && adminChoice === "manual") return "manual"
+    // Indian restaurants pick exactly ONE of the India methods — PhonePe
+    // (auto), Paytm (auto), or manual UPI. The admin's stored choice is the
+    // single source of truth; we only constrain it to the valid India set so
+    // a bad value can't route a UK restaurant through PhonePe.
+    if (def === "phonepe") {
+        if (adminChoice === "manual") return "manual"
+        if (adminChoice === "paytm") return "paytm"
+        return "phonepe"
+    }
+    // Outside India the column is ignored — Stripe is the only sane option.
     return def
 }
 
@@ -78,6 +83,7 @@ export function resolveGateway(
 export function gatewayLabel(g: PaymentGateway): string {
     switch (g) {
         case "phonepe": return "PhonePe UPI"
+        case "paytm":   return "Paytm UPI"
         case "stripe":  return "Stripe"
         case "manual":  return "Manual UPI"
     }

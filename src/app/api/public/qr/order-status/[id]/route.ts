@@ -135,10 +135,10 @@ export async function GET(
     } else if (!o.awaiting_confirmation) {
         // Order is OPEN/IN_PROGRESS but no longer awaiting → was reset by staff
         stage = "awaiting_confirmation"
-    } else if (o.payment_gateway === "phonepe" || o.payment_gateway === "stripe") {
-        // Online gateway: the customer pays via the PhonePe QR / Stripe
-        // Checkout and we wait for the webhook. No "pay_manual" stage —
-        // there's no screenshot to upload.
+    } else if (o.payment_gateway === "phonepe" || o.payment_gateway === "paytm" || o.payment_gateway === "stripe" || o.payment_gateway === "razorpay") {
+        // Online gateway: the customer pays via the PhonePe / Paytm UPI QR, the
+        // Stripe Checkout, or a legacy Razorpay order, and we wait for the
+        // webhook. No "pay_manual" stage — there's no screenshot to upload.
         stage = "awaiting_confirmation"
     } else if (!p) {
         // Manual UPI but no proof uploaded yet

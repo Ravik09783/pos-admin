@@ -120,6 +120,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
         expect(matrix).toMatchInlineSnapshot(`
           {
             "AUDITOR": {
+              "attendance.manage": false,
               "audit_log.view": true,
               "balance_sheet.write": false,
               "bill.edit_locked": false,
@@ -135,6 +136,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "order.discount": false,
               "order.modify_open": false,
               "payment.record": false,
+              "payroll.manage": false,
               "purchase.write": false,
               "reports.export": false,
               "reports.view": true,
@@ -143,6 +145,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "table.write": false,
             },
             "CAPTAIN": {
+              "attendance.manage": false,
               "audit_log.view": false,
               "balance_sheet.write": false,
               "bill.edit_locked": false,
@@ -158,6 +161,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "order.discount": false,
               "order.modify_open": true,
               "payment.record": false,
+              "payroll.manage": false,
               "purchase.write": false,
               "reports.export": false,
               "reports.view": false,
@@ -166,6 +170,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "table.write": false,
             },
             "CASHIER": {
+              "attendance.manage": false,
               "audit_log.view": false,
               "balance_sheet.write": false,
               "bill.edit_locked": false,
@@ -181,6 +186,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "order.discount": true,
               "order.modify_open": true,
               "payment.record": true,
+              "payroll.manage": false,
               "purchase.write": false,
               "reports.export": false,
               "reports.view": false,
@@ -189,6 +195,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "table.write": false,
             },
             "DELIVERY": {
+              "attendance.manage": false,
               "audit_log.view": false,
               "balance_sheet.write": false,
               "bill.edit_locked": false,
@@ -204,6 +211,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "order.discount": false,
               "order.modify_open": false,
               "payment.record": false,
+              "payroll.manage": false,
               "purchase.write": false,
               "reports.export": false,
               "reports.view": false,
@@ -212,6 +220,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "table.write": false,
             },
             "KITCHEN": {
+              "attendance.manage": false,
               "audit_log.view": false,
               "balance_sheet.write": false,
               "bill.edit_locked": false,
@@ -227,6 +236,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "order.discount": false,
               "order.modify_open": false,
               "payment.record": false,
+              "payroll.manage": false,
               "purchase.write": false,
               "reports.export": false,
               "reports.view": false,
@@ -235,6 +245,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "table.write": false,
             },
             "MANAGER": {
+              "attendance.manage": true,
               "audit_log.view": true,
               "balance_sheet.write": false,
               "bill.edit_locked": false,
@@ -250,6 +261,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "order.discount": true,
               "order.modify_open": true,
               "payment.record": true,
+              "payroll.manage": false,
               "purchase.write": true,
               "reports.export": true,
               "reports.view": true,
@@ -258,6 +270,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "table.write": true,
             },
             "OWNER": {
+              "attendance.manage": true,
               "audit_log.view": true,
               "balance_sheet.write": true,
               "bill.edit_locked": true,
@@ -273,6 +286,7 @@ describe("can() — fully exhaustive role × permission matrix", () => {
               "order.discount": true,
               "order.modify_open": true,
               "payment.record": true,
+              "payroll.manage": true,
               "purchase.write": true,
               "reports.export": true,
               "reports.view": true,

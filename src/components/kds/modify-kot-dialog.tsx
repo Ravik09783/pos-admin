@@ -136,20 +136,23 @@ export function ModifyKotDialog({
 
     const dirty = voidIds.size > 0 || adds.length > 0
 
-    const stateLocked = kotStatus !== "PENDING" && kotStatus !== "PREPARING"
+    // Editable in every state except a cancelled ticket — READY/SERVED edits
+    // are the billing-time corrections (drop an un-served item / add the one
+    // the customer took). The RPC re-enforces this + the "not yet billed" guard.
+    const stateLocked = kotStatus === "CANCELLED"
 
-    /** Reason + audit kick in only after the kitchen has started
-     *  cooking. While the KOT is still PENDING the change is free —
-     *  no waste, nobody to apologise to, no row in the audit log. */
-    const reasonRequired = kotStatus === "PREPARING"
+    /** Reason + audit kick in once the kitchen has committed to cooking
+     *  (PREPARING / READY / SERVED). A still-PENDING KOT is free to edit —
+     *  no waste, no row in the audit log. */
+    const reasonRequired = kotStatus !== "PENDING"
 
     async function save() {
         if (stateLocked) {
-            toast.error(`Can't modify — KOT is already ${kotStatus}. Send a new KOT instead.`)
+            toast.error(`Can't modify — KOT is ${kotStatus}. Send a new KOT instead.`)
             return
         }
         if (reasonRequired && reason.trim().length < 2) {
-            toast.error("Kitchen has already started — enter a reason so the audit log can record it.")
+            toast.error("Kitchen has already worked this ticket — enter a reason so the audit log can record it.")
             return
         }
         if (!dirty) {
@@ -227,11 +230,10 @@ export function ModifyKotDialog({
                     <div className="rounded-md border border-destructive/40 bg-destructive/[0.05] p-4 text-sm flex items-start gap-2">
                         <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                         <div>
-                            <strong>This KOT can&apos;t be edited.</strong> Once the kitchen
-                            marks a ticket {kotStatus}, the food is already plated. Send a
-                            <strong> new KOT</strong> for the new items instead — the new
-                            KOT will sit alongside this one on the kitchen screen and the
-                            audit log will tie them together.
+                            <strong>This KOT is cancelled.</strong> Cancelled tickets can&apos;t
+                            be edited. Send a <strong>new KOT</strong> for the items instead —
+                            it&apos;ll sit on the kitchen screen and the audit log will tie
+                            them together.
                         </div>
                     </div>
                 ) : (

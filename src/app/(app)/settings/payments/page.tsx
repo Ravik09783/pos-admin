@@ -59,6 +59,11 @@ export default function PaymentSettingsPage() {
     const [upiId, setUpiId] = useState("")
     const [upiPayee, setUpiPayee] = useState("")
 
+    // Which India method's config is on screen — PhonePe / Paytm / Manual UPI
+    // live in tabs so the operator configures ONE at a time and the three
+    // forms never crowd each other. Defaults to the tenant's active method.
+    const [methodTab, setMethodTab] = useState<"phonepe" | "paytm" | "manual">("phonepe")
+
     // PhonePe — production pair
     const [ppMidProd, setPpMidProd] = useState("")
     const [ppKeyProd, setPpKeyProd] = useState("")
@@ -70,6 +75,15 @@ export default function PaymentSettingsPage() {
     const [ppIndexStaging, setPpIndexStaging] = useState("1")
     const [ppEnv, setPpEnv] = useState<PhonePeEnv>("staging")
     const [ppEnabled, setPpEnabled] = useState(false)
+
+    // Paytm — production + staging pairs (MID + Merchant Key; no salt index)
+    const [paytmMidProd, setPaytmMidProd] = useState("")
+    const [paytmKeyProd, setPaytmKeyProd] = useState("")
+    const [paytmMidStaging, setPaytmMidStaging] = useState("")
+    const [paytmKeyStaging, setPaytmKeyStaging] = useState("")
+    const [paytmEnv, setPaytmEnv] = useState<PhonePeEnv>("staging")
+    const [paytmEnabled, setPaytmEnabled] = useState(false)
+    const [testingPaytm, setTestingPaytm] = useState(false)
 
     // Stripe
     const [stripeAccountId, setStripeAccountId] = useState("")
@@ -99,10 +113,10 @@ export default function PaymentSettingsPage() {
             setTenantId(tid)
             const { data: t } = await supabase
                 .from("tenants")
-                .select("name, country, upi_id, upi_payee_name")
+                .select("name, country, upi_id, upi_payee_name, payment_gateway")
                 .eq("id", tid)
                 .maybeSingle()
-            const tt = t as { name?: string; country?: string | null; upi_id?: string | null; upi_payee_name?: string | null } | null
+            const tt = t as { name?: string; country?: string | null; upi_id?: string | null; upi_payee_name?: string | null; payment_gateway?: string | null } | null
             setTenantName(tt?.name ?? "")
             setCountry(tt?.country ?? null)
             setUpiId(tt?.upi_id ?? "")
@@ -151,6 +165,38 @@ export default function PaymentSettingsPage() {
                     setPpEnabled(!!g.phonepe_enabled)
                 }
             }
+
+            // Paytm row (columns exist from migrations 33 + 54). Loaded
+            // separately so a missing column can't 400 the whole page.
+            const { data: paytmGw } = await supabase
+                .from("tenant_payment_gateways")
+                .select("paytm_mid, paytm_merchant_key, paytm_mid_staging, paytm_merchant_key_staging, paytm_enabled, paytm_env")
+                .eq("tenant_id", tid)
+                .maybeSingle()
+            const pg = paytmGw as {
+                paytm_mid?: string | null; paytm_merchant_key?: string | null
+                paytm_mid_staging?: string | null; paytm_merchant_key_staging?: string | null
+                paytm_enabled?: boolean | null; paytm_env?: string | null
+            } | null
+            if (pg) {
+                setPaytmMidProd(pg.paytm_mid ?? "")
+                setPaytmKeyProd(pg.paytm_merchant_key ?? "")
+                setPaytmMidStaging(pg.paytm_mid_staging ?? "")
+                setPaytmKeyStaging(pg.paytm_merchant_key_staging ?? "")
+                setPaytmEnv((pg.paytm_env ?? "staging") as PhonePeEnv)
+                setPaytmEnabled(!!pg.paytm_enabled)
+            }
+
+            // Open the tab for the currently-active method: the enabled flag
+            // wins, then the stored payment_gateway, else default to PhonePe.
+            const ppOn = (ppGw as PhonePeRow | null)?.phonepe_enabled
+            const pgw = tt?.payment_gateway
+            setMethodTab(
+                pg?.paytm_enabled || pgw === "paytm" ? "paytm"
+                    : ppOn || pgw === "phonepe" ? "phonepe"
+                    : pgw === "manual" ? "manual"
+                    : "phonepe",
+            )
             setLoading(false)
         })()
     }, [supabase])
@@ -166,6 +212,22 @@ export default function PaymentSettingsPage() {
     const activeIndex = ppEnv === "production" ? ppIndexProd : ppIndexStaging
     const phonepeConnected =
         !!ppEnabled && !!activeMid.trim() && !!activeKey.trim()
+
+    const activePaytmMid = paytmEnv === "production" ? paytmMidProd : paytmMidStaging
+    const activePaytmKey = paytmEnv === "production" ? paytmKeyProd : paytmKeyStaging
+    const paytmConnected = !!paytmEnabled && !!activePaytmMid.trim() && !!activePaytmKey.trim()
+
+    // Single active gateway: turning one ON turns the others OFF. The DB
+    // trigger (migration 58) is the backstop; this keeps the UI honest so
+    // the operator never tries to save two live gateways.
+    function enablePhonePe(v: boolean) {
+        setPpEnabled(v)
+        if (v) setPaytmEnabled(false)
+    }
+    function enablePaytm(v: boolean) {
+        setPaytmEnabled(v)
+        if (v) setPpEnabled(false)
+    }
 
     async function testPhonePe() {
         if (!activeMid.trim() || !activeKey.trim()) {
@@ -223,16 +285,66 @@ export default function PaymentSettingsPage() {
         }
     }
 
+    async function testPaytm() {
+        if (!activePaytmMid.trim() || !activePaytmKey.trim()) {
+            toast.error("Enter both Merchant ID and Merchant Key first.")
+            return
+        }
+        setTestingPaytm(true)
+        try {
+            const r = await fetch("/api/payments/paytm/test", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mid: activePaytmMid.trim(), merchant_key: activePaytmKey.trim(), env: paytmEnv }),
+            })
+            const data = await r.json() as { ok?: boolean; message?: string; error?: string }
+            if (data.ok) toast.success(data.message || "Paytm credentials are valid")
+            else toast.error(data.error || "Paytm rejected the credentials")
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Couldn't reach Paytm")
+        } finally {
+            setTestingPaytm(false)
+        }
+    }
+
+    async function disconnectPaytm() {
+        if (!window.confirm("Disconnect Paytm? In-flight transactions still resolve, but no new Paytm QRs can be minted until you reconnect.")) return
+        try {
+            const { error } = await supabase
+                .from("tenant_payment_gateways")
+                .upsert({
+                    tenant_id: tenantId,
+                    paytm_mid: null, paytm_merchant_key: null,
+                    paytm_mid_staging: null, paytm_merchant_key_staging: null,
+                    paytm_enabled: false,
+                } as never)
+            if (error) throw error
+            setPaytmMidProd(""); setPaytmKeyProd(""); setPaytmMidStaging(""); setPaytmKeyStaging("")
+            setPaytmEnv("staging"); setPaytmEnabled(false)
+            toast.success("Paytm disconnected")
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Disconnect failed")
+        }
+    }
+
     async function save() {
         if (!tenantId) return
         setSaving(true)
         try {
+            // For India, the active method is the single source of truth in
+            // tenants.payment_gateway: whichever online gateway is enabled, or
+            // 'manual' when neither is. Non-India tenants route through Stripe
+            // (the resolver ignores this column for them) so we leave it alone.
+            const tenantUpdate: Record<string, unknown> = {
+                upi_id: upiId.trim() || null,
+                upi_payee_name: upiPayee.trim() || null,
+            }
+            if (isIndia) {
+                tenantUpdate.payment_gateway = ppEnabled ? "phonepe" : paytmEnabled ? "paytm" : "manual"
+            }
             const { error: tErr } = await supabase
                 .from("tenants")
-                .update({
-                    upi_id: upiId.trim() || null,
-                    upi_payee_name: upiPayee.trim() || null,
-                } as never)
+                .update(tenantUpdate as never)
                 .eq("id", tenantId)
             if (tErr) throw tErr
             // Build the upsert payload conditionally — if the PhonePe
@@ -254,6 +366,13 @@ export default function PaymentSettingsPage() {
                 upsertPayload.phonepe_env = ppEnv
                 upsertPayload.phonepe_enabled = ppEnabled
             }
+            // Paytm columns exist from migrations 33 + 54.
+            upsertPayload.paytm_mid = paytmMidProd.trim() || null
+            upsertPayload.paytm_merchant_key = paytmKeyProd.trim() || null
+            upsertPayload.paytm_mid_staging = paytmMidStaging.trim() || null
+            upsertPayload.paytm_merchant_key_staging = paytmKeyStaging.trim() || null
+            upsertPayload.paytm_env = paytmEnv
+            upsertPayload.paytm_enabled = paytmEnabled
             const { error: gErr } = await supabase
                 .from("tenant_payment_gateways")
                 .upsert(upsertPayload as never)
@@ -347,9 +466,20 @@ export default function PaymentSettingsPage() {
                 }
             />
 
-            {/* ── India: PhonePe + manual UPI ──────────────────────── */}
+            {/* ── India: PhonePe / Paytm / Manual UPI in tabs ──────────
+              * One tab per method so the three forms never crowd each other.
+              * The active method (the one that's enabled) is marked with a dot;
+              * enabling a gateway in its tab disables the others (single-active
+              * rule, enforced in save() + the DB trigger). */}
             {isIndia && (
-                <>
+                <Tabs value={methodTab} onValueChange={(v) => setMethodTab(v as "phonepe" | "paytm" | "manual")} className="space-y-4">
+                    <TabsList className="grid grid-cols-3 w-full">
+                        <TabsTrigger value="phonepe">PhonePe{ppEnabled ? " ●" : ""}</TabsTrigger>
+                        <TabsTrigger value="paytm">Paytm{paytmEnabled ? " ●" : ""}</TabsTrigger>
+                        <TabsTrigger value="manual">Manual UPI{!ppEnabled && !paytmEnabled ? " ●" : ""}</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="phonepe" className="space-y-4 mt-0">
                     <Card className="border-primary/30">
                         <CardHeader className="space-y-3">
                             <div className="flex items-start justify-between gap-3">
@@ -397,10 +527,10 @@ export default function PaymentSettingsPage() {
                                 <div>
                                     <Label>Accept UPI payments via PhonePe</Label>
                                     <p className="text-xs text-muted-foreground">
-                                        Toggle off to temporarily stop minting new PhonePe transactions without erasing credentials.
+                                        Toggle off to temporarily stop minting new PhonePe transactions without erasing credentials. Enabling this turns Paytm off — only one gateway runs at a time.
                                     </p>
                                 </div>
-                                <Switch checked={ppEnabled} onCheckedChange={setPpEnabled} />
+                                <Switch checked={ppEnabled} onCheckedChange={enablePhonePe} />
                             </div>
                             )}
 
@@ -528,7 +658,89 @@ export default function PaymentSettingsPage() {
                             )}
                         </CardContent>
                     </Card>
+                    </TabsContent>
 
+                    {/* ── Paytm ──────────────────────────────────────── */}
+                    <TabsContent value="paytm" className="space-y-4 mt-0">
+                    <Card className="border-primary/20">
+                        <CardHeader className="space-y-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Wallet className="h-4 w-4 text-primary" />
+                                Paytm
+                                {paytmConnected ? (
+                                    <Badge variant="success" className="ml-2 text-[10px]">Connected</Badge>
+                                ) : (
+                                    <Badge variant="outline" className="ml-2 text-[10px]">Not connected</Badge>
+                                )}
+                            </CardTitle>
+                            <CardDescription>
+                                Auto-confirmed UPI via Paytm&apos;s dynamic QR — same scan-to-pay + webhook flow as PhonePe. Connect your own Paytm Business account; money settles to your bank.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 p-3">
+                                <div>
+                                    <Label>Accept UPI payments via Paytm</Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Enabling this turns PhonePe off — only one gateway runs at a time.
+                                    </p>
+                                </div>
+                                <Switch checked={paytmEnabled} onCheckedChange={enablePaytm} />
+                            </div>
+
+                            <Tabs value={paytmEnv} onValueChange={(v) => setPaytmEnv(v as PhonePeEnv)} className="space-y-3">
+                                <TabsList className="grid grid-cols-2 w-full">
+                                    <TabsTrigger value="staging">Sandbox (staging)</TabsTrigger>
+                                    <TabsTrigger value="production">Production (live)</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="staging" className="space-y-3 mt-0">
+                                    <p className="text-xs text-muted-foreground">
+                                        Paytm test credentials from your dashboard (securegw-stage). Validate end-to-end here before going live.
+                                    </p>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="paytm-mid-staging">Merchant ID (MID)</Label>
+                                        <Input id="paytm-mid-staging" placeholder="TESTMID..." value={paytmMidStaging} onChange={(e) => setPaytmMidStaging(e.target.value)} autoComplete="off" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="paytm-key-staging">Merchant Key</Label>
+                                        <Input id="paytm-key-staging" type="password" placeholder="Test Merchant Key" value={paytmKeyStaging} onChange={(e) => setPaytmKeyStaging(e.target.value)} autoComplete="off" />
+                                        <p className="text-[11px] text-muted-foreground">Stored encrypted at rest. Only the OWNER role can read this back.</p>
+                                    </div>
+                                </TabsContent>
+                                <TabsContent value="production" className="space-y-3 mt-0">
+                                    <p className="text-xs text-muted-foreground">
+                                        Live Paytm credentials (securegw). Switch the active environment here only after the sandbox flow works end-to-end.
+                                    </p>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="paytm-mid-prod">Merchant ID (MID)</Label>
+                                        <Input id="paytm-mid-prod" placeholder="Your live MID" value={paytmMidProd} onChange={(e) => setPaytmMidProd(e.target.value)} autoComplete="off" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="paytm-key-prod">Merchant Key</Label>
+                                        <Input id="paytm-key-prod" type="password" placeholder="Live Merchant Key" value={paytmKeyProd} onChange={(e) => setPaytmKeyProd(e.target.value)} autoComplete="off" />
+                                    </div>
+                                </TabsContent>
+                            </Tabs>
+
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <Button type="button" variant="outline" size="sm" onClick={testPaytm} disabled={testingPaytm}>
+                                    {testingPaytm ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                                    Test connection
+                                </Button>
+                                {paytmConnected && (
+                                    <Button type="button" variant="ghost" size="sm" onClick={disconnectPaytm} className="text-destructive hover:bg-destructive/10">
+                                        <AlertCircle className="h-4 w-4" /> Disconnect Paytm
+                                    </Button>
+                                )}
+                                <div className="ml-auto text-[11px] text-muted-foreground">
+                                    Active: {paytmEnv === "production" ? "Production" : "Sandbox"}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    </TabsContent>
+
+                    <TabsContent value="manual" className="space-y-4 mt-0">
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base flex items-center gap-2">
@@ -563,7 +775,8 @@ export default function PaymentSettingsPage() {
                             </div>
                         </CardContent>
                     </Card>
-                </>
+                    </TabsContent>
+                </Tabs>
             )}
 
             {/* ── Non-India: Stripe Connect ────────────────────────── */}

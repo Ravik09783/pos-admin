@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { useEffect, useState, useSyncExternalStore } from "react"
 import {
     AlertCircle,
+    Banknote,
     BarChart3,
     BellRing,
     Bike,
@@ -12,11 +13,15 @@ import {
     Boxes,
     Brain,
     Building2,
+    CalendarCheck,
     CalendarDays,
+    CalendarOff,
     ChefHat,
+    Clock,
     Coins,
     CreditCard,
     FileSpreadsheet,
+    FileText,
     Gift,
     History,
     Landmark,
@@ -133,6 +138,22 @@ const NAV: NavItem[] = [
     { href: "/purchases", icon: Receipt, label: "Purchases", roles: OWNER_MGR },
     { href: "/ca-export", icon: FileSpreadsheet, label: "CA Export", highlight: true, roles: OWNER_ONLY, permission: "ca_export.run" },
 
+    // ── Staff — attendance + payroll (HR). Gated by `attendance.manage`,
+    // which is delegable via role templates, so we DON'T pin roles here
+    // (same pattern as /settings/staff): the permission is the real gate
+    // so a "designated" attendance manager on a custom template sees these
+    // even if their base role wouldn't. RLS + the hr_* RPCs enforce it.
+    { section: "Staff", href: "/hr/attendance", icon: CalendarCheck, label: "Attendance", permission: "attendance.manage" },
+    { href: "/hr/sheet", icon: CalendarDays, label: "Monthly sheet", permission: "attendance.manage" },
+    { href: "/hr/employees", icon: Users, label: "Employees", permission: "attendance.manage" },
+    { href: "/hr/leaves", icon: CalendarOff, label: "Leave & holidays", permission: "attendance.manage" },
+    { href: "/hr/payroll", icon: Banknote, label: "Payroll", permission: "payroll.manage" },
+    // Payslips is intentionally ungated — employees reach it to download their
+    // own slips (RLS shows only theirs); managers see everyone's. Same "visible
+    // to all, gated by RLS" pattern as /orders.
+    { href: "/hr/payslips", icon: FileText, label: "Payslips" },
+    { href: "/hr/history", icon: Clock, label: "Attendance history", permission: "attendance.manage" },
+
     // ── Setup — touched once at onboarding, occasionally afterwards.
     { section: "Setup", href: "/settings", icon: Settings, label: "Settings", roles: OWNER_ONLY },
     { href: "/settings/billing", icon: Wallet, label: "Billing", roles: OWNER_ONLY },
@@ -149,6 +170,7 @@ const NAV: NavItem[] = [
     { href: "/settings/payments", icon: Zap, label: "Payment gateway", roles: OWNER_ONLY },
     { href: "/settings/tax", icon: Percent, label: "Tax", roles: OWNER_ONLY },
     { href: "/settings/bill-design", icon: Palette, label: "Bill design", roles: OWNER_MGR },
+    { href: "/settings/payslip-design", icon: FileText, label: "Salary slip design", permission: "payroll.manage" },
     { href: "/settings/notifications", icon: BellRing, label: "Notifications", roles: OWNER_MGR },
     // Customer display — merged surface. The page itself shows:
     //   1. Every staff member's personal URL (top)

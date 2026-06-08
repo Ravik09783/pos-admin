@@ -31,6 +31,15 @@ export const PERMISSIONS = {
     "purchase.write":      ["OWNER", "MANAGER"],
     "expense.write":       ["OWNER", "MANAGER"],
     "balance_sheet.write": ["OWNER"],
+    /** HR — attendance (migration 56). Manage the employee roster, mark/
+     *  correct attendance, and view the monthly sheet + history. Delegable:
+     *  an Owner can grant it to a custom template so a "designated"
+     *  attendance manager can run it without being an Owner. DB-enforced
+     *  via user_has_permission() in the hr_* RPCs. */
+    "attendance.manage":   ["OWNER", "MANAGER"],
+    /** HR — payroll (Phase 2). Configure salary, generate/finalise payslips
+     *  and design the slip format. Scaffolded now; surfaces in Phase 2. */
+    "payroll.manage":      ["OWNER"],
 } as const satisfies Record<string, readonly UserRole[]>
 
 export type Permission = keyof typeof PERMISSIONS
@@ -164,6 +173,16 @@ export const PERMISSION_META: Record<Permission, {
     "balance_sheet.write": {
         label: "Edit the balance sheet",
         description: "Lets this user enter or edit balance-sheet entries used by the CA export.",
+        category: "Finance", enforcement: "db",
+    },
+    "attendance.manage": {
+        label: "Manage attendance",
+        description: "Lets this user add employees, mark and correct daily attendance, add missing hours, and view the monthly attendance sheet and edit history.",
+        category: "Operations", enforcement: "db",
+    },
+    "payroll.manage": {
+        label: "Manage payroll",
+        description: "Lets this user set employee salaries, generate and finalise salary slips, and design the slip format.",
         category: "Finance", enforcement: "db",
     },
 }

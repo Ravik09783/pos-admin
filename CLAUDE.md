@@ -46,8 +46,19 @@ If you only remember three things from this file:
    - Inserts the `bills` row
    - Audit-logs to `bill_audit_log`
 4. Payment via `supabase.rpc("record_payment", ...)` (cash/UPI/card/etc.)
-   or the Razorpay/Stripe webhook (server-side, HMAC-verified,
-   idempotent on `client_request_id`).
+   or an auto-confirm gateway webhook (server-side, signature-verified,
+   idempotent on `order_id`). Each restaurant runs **one** active gateway,
+   chosen in Settings → Payments and stored in `tenants.payment_gateway`
+   (`manual` / `phonepe` / `paytm` / `stripe`; a DB trigger enforces only
+   one online gateway enabled at a time):
+   - **PhonePe / Paytm** (India, UPI QR) — webhook → `confirm_phonepe_payment`
+     / `confirm_qr_order_system|confirm_display_checkout_payment(…, 'PAYTM')`
+     auto-creates the bill. A 10-min reconcile cron is the missed-webhook net.
+   - **Stripe** (outside India) — Connect destination charge, webhook confirms.
+   - **Manual UPI** — no webhook: customer uploads a screenshot
+     (`qr_payment_proofs`), staff confirm via `confirm_qr_order`.
+   The full flow + the webhook→DB-field map live in
+   [`docs/payment-gateways.md`](docs/payment-gateways.md).
 5. When `totalPaid >= grand_total`, bill flips to `PAID`. Kitchen tickets
    for that order become irrelevant.
 

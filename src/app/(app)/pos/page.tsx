@@ -51,6 +51,10 @@ export default function POSPage() {
 
     const [loading, setLoading] = useState(true)
     const [tenantId, setTenantId] = useState<string>("")
+    // The tenant's active payment gateway ('manual' | 'phonepe' | 'paytm' |
+    // 'stripe'). Drives which UPI display-checkout endpoint the cashier's
+    // scan-to-pay flow hits (PhonePe vs Paytm). Null until the tenant loads.
+    const [paymentGateway, setPaymentGateway] = useState<string | null>(null)
     // The signed-in cashier's user id. This is the STABLE key for the
     // customer-display row: pos_display_sessions has one row per
     // `created_by`, that row's `id` can churn (delete + re-insert), but
@@ -312,7 +316,7 @@ export default function POSPage() {
                 menuQ = menuQ.or(`branch_id.eq.${activeBranchId},branch_id.is.null`)
             }
             const [tenantRes, catsRes, itemsRes, recsRes] = await Promise.all([
-                supabase.from("tenants").select("name, country, service_charge_percent, upi_id, upi_payee_name, tax_enabled").eq("id", resolvedTenantId).maybeSingle(),
+                supabase.from("tenants").select("name, country, service_charge_percent, upi_id, upi_payee_name, tax_enabled, payment_gateway").eq("id", resolvedTenantId).maybeSingle(),
                 supabase.from("menu_categories").select("*").is("deleted_at", null).order("sort_order"),
                 menuQ,
                 supabase
@@ -337,7 +341,7 @@ export default function POSPage() {
             const tenant = tenantRes.data as {
                 name?: string; country?: string | null; service_charge_percent?: number
                 upi_id?: string | null; upi_payee_name?: string | null
-                tax_enabled?: boolean | null
+                tax_enabled?: boolean | null; payment_gateway?: string | null
             } | null
             const cats = (catsRes.data ?? []) as MenuCategory[]
             const its = (itemsRes.data ?? []) as MenuItem[]
@@ -348,6 +352,7 @@ export default function POSPage() {
 
             setTenantName(tenant?.name ?? "")
             setTenantCountry(tenant?.country ?? null)
+            setPaymentGateway(tenant?.payment_gateway ?? null)
             setTenantUpiId(tenant?.upi_id ?? null)
             setTenantUpiPayeeName(tenant?.upi_payee_name ?? null)
             setRawServiceChargePct(Number(tenant?.service_charge_percent ?? 0))
@@ -1255,7 +1260,15 @@ export default function POSPage() {
             let transportErr: string | null = null
             let fallbackReason: string | null = null
             try {
-                const r = await fetch("/api/payments/phonepe/display-checkout", {
+                // Pick the UPI auto-confirm endpoint by the tenant's active
+                // gateway: Paytm → Paytm route; otherwise PhonePe (the India
+                // default). Both return the same { ok, qr_data, auto_confirm,
+                // checkout_session_id } shape so the rest of this block is
+                // gateway-agnostic.
+                const upiEndpoint = paymentGateway === "paytm"
+                    ? "/api/payments/paytm/display-checkout"
+                    : "/api/payments/phonepe/display-checkout"
+                const r = await fetch(upiEndpoint, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ display_session_id: sid }),
@@ -1267,6 +1280,7 @@ export default function POSPage() {
                     checkout_session_id?: string | null
                     reason?: string | null
                     phonepe_error?: string | null
+                    paytm_error?: string | null
                     error?: string | null
                 } | null
                 if (data?.ok && data.qr_data) {
@@ -1276,7 +1290,7 @@ export default function POSPage() {
                 } else if (data?.reason === "not_configured") {
                     notConfigured = true
                 } else {
-                    transportErr = data?.phonepe_error ?? data?.error ?? `HTTP ${r.status}`
+                    transportErr = data?.phonepe_error ?? data?.paytm_error ?? data?.error ?? `HTTP ${r.status}`
                     fallbackReason = transportErr
                 }
             } catch (e) {

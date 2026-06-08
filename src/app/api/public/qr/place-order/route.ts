@@ -11,6 +11,13 @@ import {
     type PhonePeCreds,
     type TenantPhonePeRow,
 } from "@/lib/billing/phonepe"
+import {
+    createPaytmQr,
+    paytmEnvCreds,
+    resolveTenantPaytmCreds,
+    type PaytmCreds,
+    type TenantPaytmRow,
+} from "@/lib/billing/paytm"
 import { getClientIp, rateLimit } from "@/lib/rate-limit"
 
 interface PlaceOrderBody {
@@ -152,6 +159,7 @@ export async function POST(req: Request) {
     }
     let stripeAcct: StripeConnect | null = null
     let phonepeCreds: PhonePeCreds | null = null
+    let paytmCreds: PaytmCreds | null = null
     // The gateway we actually run this order through. Starts as the
     // resolved gateway, then downgrades phonepe → manual when PhonePe
     // isn't connected so a transient gap doesn't block ordering.
@@ -166,6 +174,21 @@ export async function POST(req: Request) {
         phonepeCreds =
             resolveTenantPhonePeCreds(gw as TenantPhonePeRow | null) ?? phonepeEnvCreds()
         if (!phonepeCreds) {
+            if (!t.upi_id) {
+                return NextResponse.json({
+                    error: "Restaurant has not finished setting up online payments. Please ask staff to take payment in person.",
+                }, { status: 400 })
+            }
+            effectiveGateway = "manual"
+        }
+    } else if (gateway === "paytm") {
+        const { data: gw } = await supabase
+            .from("tenant_payment_gateways")
+            .select("paytm_mid, paytm_merchant_key, paytm_mid_staging, paytm_merchant_key_staging, paytm_enabled, paytm_env")
+            .eq("tenant_id", t.id)
+            .maybeSingle()
+        paytmCreds = resolveTenantPaytmCreds(gw as TenantPaytmRow | null) ?? paytmEnvCreds()
+        if (!paytmCreds) {
             if (!t.upi_id) {
                 return NextResponse.json({
                     error: "Restaurant has not finished setting up online payments. Please ask staff to take payment in person.",
@@ -444,6 +467,54 @@ export async function POST(req: Request) {
                 intent_uri: result.intentUri ?? null,
                 qr_data: result.qrData ?? result.intentUri ?? null,
                 redirect_url: result.redirectUrl ?? null,
+            },
+        })
+    }
+
+    // ===== Paytm path =====
+    // Mint a Paytm dynamic UPI QR. The customer scans it in any UPI app; the
+    // Paytm webhook (`/api/webhooks/paytm`) flips the PENDING
+    // paytm_payment_events row to SUCCESS and calls confirm_qr_order_system
+    // (p_method='PAYTM') which finalises the bill. Reconcile cron is the
+    // missed-webhook safety net. Same auto-confirm guarantee as PhonePe.
+    if (effectiveGateway === "paytm" && paytmCreds) {
+        const paytmOrderId = `qr-${orderId.slice(0, 8)}-${Date.now().toString(36)}`
+        const { error: eventErr } = await supabase
+            .from("paytm_payment_events")
+            .insert({
+                paytm_order_id: paytmOrderId,
+                tenant_id: t.id,
+                order_id: orderId,
+                amount: grandTotal,
+                currency: t.currency ?? "INR",
+                flow: "QR_ORDER",
+                status: "PENDING",
+            } as never)
+        if (eventErr) {
+            logError(eventErr, { route: "/api/public/qr/place-order", tenantId: t.id, orderId, stage: "paytm_event_insert" })
+            return NextResponse.json({ error: "Couldn't start Paytm payment. Try again." }, { status: 500 })
+        }
+
+        const result = await createPaytmQr(paytmCreds, { orderId: paytmOrderId, amount: grandTotal })
+        if (!result.ok || !result.qrData) {
+            await supabase
+                .from("paytm_payment_events")
+                .update({ status: "FAILED", raw: result.raw ?? null, processed_at: new Date().toISOString() } as never)
+                .eq("paytm_order_id", paytmOrderId)
+            logError(`createPaytmQr failed: ${result.message}`, { route: "/api/public/qr/place-order", tenantId: t.id, orderId, paytmOrderId })
+            return NextResponse.json({ error: result.message || "Paytm rejected the payment" }, { status: 502 })
+        }
+
+        return NextResponse.json({
+            ok: true,
+            gateway: "paytm",
+            order_id: orderId,
+            order_number: orderNumber,
+            amount: grandTotal,
+            coupon_discount: couponDiscount,
+            paytm: {
+                paytm_order_id: paytmOrderId,
+                qr_data: result.qrData,
             },
         })
     }

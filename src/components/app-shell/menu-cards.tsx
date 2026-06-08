@@ -174,6 +174,13 @@ const SECTION_ACCENT: Record<string, SectionAccent> = {
         panelBorder: "border-amber-500/25 dark:border-amber-500/15",
         glow: "",
     },
+    Staff: {
+        ring: "bg-blue-500/20",
+        text: "text-blue-600 dark:text-blue-500",
+        panel: "bg-blue-500/[0.04]",
+        panelBorder: "border-blue-500/25 dark:border-blue-500/15",
+        glow: "",
+    },
     Setup: {
         ring: "bg-muted-foreground/15",
         text: "text-muted-foreground",
@@ -195,6 +202,7 @@ const SECTION_SUBTITLE: Record<string, string> = {
     Customers:  "Loyalty, gift cards, and coupons.",
     Reports:    "What's working — and what's not.",
     Finance:    "Money in, money out, tax-ready exports.",
+    Staff:      "Attendance, monthly sheet, employees & history.",
     Setup:      "Staff, branches, payments, integrations.",
 }
 

@@ -617,37 +617,39 @@ function RunningOrderSheet({
                                                     KOT #{k.kot_number} <span className="opacity-70">· batch {k.seq_in_order}</span>
                                                 </div>
                                                 <div className="flex items-center gap-1.5">
-                                                    {/* Modify + Cancel both only valid for KOTs the
-                                                      * kitchen hasn't plated yet. Modify edits the
-                                                      * items (with an audit row if PREPARING).
-                                                      * Cancel kills the whole KOT. Both call
-                                                      * server RPCs that re-enforce the state guard,
-                                                      * so hiding the buttons here is purely UX. */}
+                                                    {/* Modify is allowed in EVERY state except a
+                                                      * cancelled ticket — including READY/SERVED, so
+                                                      * the cashier can fix items at billing time (drop
+                                                      * an item the customer never got, add the one they
+                                                      * took). A reason is required + audit-logged for
+                                                      * anything past PENDING. Cancel stays limited to
+                                                      * not-yet-plated KOTs. Both RPCs re-enforce the
+                                                      * guards server-side, so this is purely UX. */}
+                                                    {k.status !== "CANCELLED" && (
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="h-6 w-6"
+                                                            title="Edit items on this KOT (add a missing item or remove one not served)"
+                                                            onClick={() => setModifyingKotId(k.id)}
+                                                            disabled={cancellingKotId === k.id}
+                                                        >
+                                                            <Edit3 className="h-3 w-3" />
+                                                        </Button>
+                                                    )}
                                                     {(k.status === "PENDING" || k.status === "PREPARING") && (
-                                                        <>
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                className="h-6 w-6"
-                                                                title="Modify items on this KOT (logs reason + history)"
-                                                                onClick={() => setModifyingKotId(k.id)}
-                                                                disabled={cancellingKotId === k.id}
-                                                            >
-                                                                <Edit3 className="h-3 w-3" />
-                                                            </Button>
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                className="h-6 w-6"
-                                                                title="Cancel this KOT (kitchen stops cooking)"
-                                                                onClick={() => cancelKot(k.id, k.kot_number, k.status)}
-                                                                disabled={cancellingKotId === k.id}
-                                                            >
-                                                                {cancellingKotId === k.id
-                                                                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                                                                    : <Ban className="h-3 w-3 text-destructive" />}
-                                                            </Button>
-                                                        </>
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="h-6 w-6"
+                                                            title="Cancel this KOT (kitchen stops cooking)"
+                                                            onClick={() => cancelKot(k.id, k.kot_number, k.status)}
+                                                            disabled={cancellingKotId === k.id}
+                                                        >
+                                                            {cancellingKotId === k.id
+                                                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                                : <Ban className="h-3 w-3 text-destructive" />}
+                                                        </Button>
                                                     )}
                                                     <Badge variant={accent === "destructive" ? "destructive" : accent === "success" ? "success" : accent === "warning" ? "warning" : "outline"} className="text-[10px]">
                                                         {KOT_STATUS_LABEL[k.status]}

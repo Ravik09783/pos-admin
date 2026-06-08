@@ -150,6 +150,182 @@ export interface RoleTemplate {
     updated_at: string
 }
 
+// ── HR: attendance + payroll (migration 56) ────────────────────────────────
+
+export type EmploymentType = "FULL_TIME" | "PART_TIME" | "CONTRACT" | "DAILY_WAGE"
+export type SalaryBasis = "MONTHLY" | "DAILY" | "HOURLY"
+export type AttendanceStatus =
+    | "PRESENT"
+    | "ABSENT"
+    | "HALF_DAY"
+    | "LEAVE"
+    | "HOLIDAY"
+    | "WEEKLY_OFF"
+export type AttendanceSource = "SELF" | "ADMIN" | "SYSTEM"
+export type AttendanceAuditAction =
+    | "PUNCH_IN"
+    | "PUNCH_OUT"
+    | "CREATE"
+    | "UPDATE"
+    | "DELETE"
+export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED"
+export type PayslipStatus = "DRAFT" | "FINALIZED" | "PAID"
+export type SalaryComponentType = "fixed" | "percent"
+
+/** A configurable earning or deduction on an employee's salary structure.
+ *  `percent` earnings are a % of earned base; `percent` deductions a % of
+ *  gross. See the formula in migration 57 / src/lib/hr/salary.ts. */
+export interface SalaryComponent {
+    name: string
+    type: SalaryComponentType
+    amount: number
+}
+/** A computed line on a generated payslip (snapshot, amounts only). */
+export interface PayslipLine {
+    name: string
+    amount: number
+}
+
+/** An entry in the unlimited employee roster — decoupled from login `users`
+ *  (which are plan-limited). `user_id` optionally links a login account so
+ *  that person can self-punch + (Phase 2) download their own slips. The
+ *  salary_* columns are Phase-2 scaffolding, nullable until payroll ships. */
+export interface HrEmployee {
+    id: string
+    tenant_id: string
+    branch_id: string | null
+    user_id: string | null
+    emp_code: string | null
+    full_name: string
+    phone: string | null
+    email: string | null
+    designation: string | null
+    department: string | null
+    date_of_joining: string | null
+    employment_type: EmploymentType
+    photo_url: string | null
+    salary_basis: SalaryBasis | null
+    base_amount: number | null
+    expected_hours_per_day: number | null
+    weekly_offs: number[] | null
+    /** Salary structure (migration 57). */
+    earnings: SalaryComponent[]
+    deductions: SalaryComponent[]
+    bank_name: string | null
+    bank_account: string | null
+    bank_ifsc: string | null
+    pan: string | null
+    is_active: boolean
+    created_at: string
+    updated_at: string
+}
+
+/** One attendance row per employee per day (upsert key
+ *  tenant_id+employee_id+work_date). */
+export interface HrAttendance {
+    id: string
+    tenant_id: string
+    employee_id: string
+    branch_id: string | null
+    work_date: string
+    status: AttendanceStatus
+    check_in: string | null
+    check_out: string | null
+    worked_minutes: number
+    late_minutes: number
+    overtime_minutes: number
+    source: AttendanceSource
+    notes: string | null
+    marked_by: string | null
+    created_at: string
+    updated_at: string
+}
+
+/** Append-only history of every attendance change. */
+export interface HrAttendanceAudit {
+    id: string
+    tenant_id: string
+    employee_id: string | null
+    attendance_id: string | null
+    action: AttendanceAuditAction
+    before_state: Record<string, unknown> | null
+    after_state: Record<string, unknown> | null
+    reason: string | null
+    changed_by: string | null
+    created_at: string
+}
+
+export interface HrHoliday {
+    id: string
+    tenant_id: string
+    branch_id: string | null
+    holiday_date: string
+    name: string
+    created_by: string | null
+    created_at: string
+}
+
+export interface HrLeaveType {
+    id: string
+    tenant_id: string
+    name: string
+    is_paid: boolean
+    annual_quota: number
+    is_active: boolean
+    created_at: string
+}
+
+export interface HrLeave {
+    id: string
+    tenant_id: string
+    employee_id: string
+    leave_type_id: string | null
+    from_date: string
+    to_date: string
+    days: number
+    reason: string | null
+    status: LeaveStatus
+    decided_by: string | null
+    decided_at: string | null
+    created_by: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface HrPayslip {
+    id: string
+    tenant_id: string
+    employee_id: string
+    branch_id: string | null
+    period_month: string
+    currency: string
+    salary_basis: SalaryBasis
+    base_amount: number
+    working_days: number
+    present_days: number
+    half_days: number
+    leave_days: number
+    holiday_days: number
+    weekly_off_days: number
+    absent_days: number
+    payable_days: number
+    worked_minutes: number
+    overtime_minutes: number
+    overtime_amount: number
+    earned_base: number
+    gross_earnings: number
+    total_deductions: number
+    net_pay: number
+    earnings: PayslipLine[]
+    deductions: PayslipLine[]
+    status: PayslipStatus
+    notes: string | null
+    generated_by: string | null
+    finalized_at: string | null
+    created_at: string
+    updated_at: string
+}
+
 export interface MenuCategory {
     id: string
     tenant_id: string

@@ -659,6 +659,29 @@ export default function QRMenuPage() {
                 return
             }
 
+            // Paytm path — render the dynamic UPI QR. Same auto-confirm model
+            // as PhonePe: the Paytm webhook (or reconcile cron) runs
+            // confirm_qr_order_system server-side and the poller advances to
+            // the success screen. We reuse phonepeIntent as the generic
+            // "auto-confirm online-UPI" marker so the pay screen skips the
+            // screenshot-upload step.
+            if (data.gateway === "paytm" && data.paytm?.qr_data) {
+                const intent = data.paytm.qr_data as string
+                setPhonePeIntent(/^upi:/i.test(intent) ? intent : "paytm")
+                let qrPng: string
+                if (intent.startsWith("data:")) qrPng = intent
+                else if (/^upi:/i.test(intent)) {
+                    qrPng = await QRCode.toDataURL(intent, { margin: 1, width: 360, color: { dark: "#0a0e1a", light: "#ffffff" } })
+                } else {
+                    // Paytm returned a raw base64 PNG QR — render it directly.
+                    qrPng = `data:image/png;base64,${intent}`
+                }
+                setUpiQrUrl(qrPng)
+                setStage("pay_manual")
+                setCartOpen(false)
+                return
+            }
+
             // Stripe path — redirect the customer to Stripe's hosted Checkout.
             // After payment they bounce back to /qr/<slug>/<table>?paid=<orderId>;
             // the page's existing reload-restore picks the order back up from

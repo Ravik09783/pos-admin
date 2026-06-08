@@ -18,6 +18,10 @@ export default defineConfig({
     resolve: {
         alias: {
             "@": path.resolve(__dirname, "./src"),
+            // `server-only` is a build-time guard with no Node entry point;
+            // stub it so server-only modules (e.g. billing/paytm.ts) can be
+            // unit-tested directly.
+            "server-only": path.resolve(__dirname, "./tests/empty-module.ts"),
         },
     },
 })
