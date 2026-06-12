@@ -41,6 +41,8 @@ export function CAExportShowcase() {
                             "GSTR-3B summary with net tax payable",
                             "P&L statement + Balance Sheet inputs ready for review",
                             "Tally-importable XML — drop into Tally and go",
+                            "Multi-outlet? Export one location or all — files are named per outlet",
+                            "Grab any single format too — Excel, PDF, CSV, Tally XML or GST JSON — or customise what goes in the ZIP",
                         ].map((line) => (
                             <li key={line} className="flex items-start gap-2 text-sm">
                                 <span className="grid place-items-center h-5 w-5 rounded-full bg-success/20 text-success shrink-0 mt-0.5">✓</span>

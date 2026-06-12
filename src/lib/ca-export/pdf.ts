@@ -4,7 +4,7 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 
 import { formatCurrency } from "@/lib/utils"
-import { exportLocale, taxCells, combinedTax } from "./locale"
+import { BRANCH_SCOPE_NOTE, exportLocale, scopeLabel, showBranchColumn, taxCells, combinedTax } from "./locale"
 import type { ExportDataset } from "./types"
 
 export function buildPdfReport(data: ExportDataset): Uint8Array {
@@ -23,7 +23,11 @@ export function buildPdfReport(data: ExportDataset): Uint8Array {
     doc.text(data.tenant.name, 40, 36)
     doc.setFontSize(11)
     doc.setFont("helvetica", "normal")
-    doc.text(`Tax Export — ${data.period.label} (FY ${data.period.fyLabel})`, 40, 56)
+    const location = scopeLabel(data)
+    doc.text(
+        `Tax Export — ${data.period.label} (FY ${data.period.fyLabel})${location ? ` — ${location}` : ""}`,
+        40, 56,
+    )
     if (data.tenant.gstin) doc.text(`${loc.taxIdLabel}: ${data.tenant.gstin}`, 40, 72)
 
     let y = 110
@@ -31,7 +35,15 @@ export function buildPdfReport(data: ExportDataset): Uint8Array {
 
     // ---- Filing summary ----
     section(doc, "Filing summary", y); y += 18
+    if (data.branch) {
+        doc.setFontSize(8)
+        doc.setTextColor(120)
+        doc.text(BRANCH_SCOPE_NOTE, 40, y)
+        doc.setTextColor(0, 0, 0)
+        y += 14
+    }
     const summaryBody: string[][] = [
+        ...(location ? [["Location", location]] : []),
         ["Gross sales (incl. tax)", money(data.summary.gross_sales)],
         ["Voided bills", String(data.summary.void_count)],
         ["Taxable outward supplies", money(data.summary.taxable_outward)],
@@ -65,14 +77,16 @@ export function buildPdfReport(data: ExportDataset): Uint8Array {
     })
 
     // ---- Sales register ----
+    const withBranch = showBranchColumn(data)
     doc.addPage()
     section(doc, "Sales register", 50)
     autoTable(doc, {
         startY: 70,
-        head: [["Invoice", "Date", "Customer", "Taxable", ...loc.taxColumns, "Total"]],
+        head: [["Invoice", "Date", ...(withBranch ? ["Branch"] : []), "Customer", "Taxable", ...loc.taxColumns, "Total"]],
         body: data.sales.map((s) => [
             s.invoice_number,
             fmtDate(s.invoice_date, loc.cfg.locale),
+            ...(withBranch ? [s.branch_name ?? "—"] : []),
             s.customer_name ?? "Walk-in",
             money(s.taxable_amount),
             ...taxCells(loc, s).map(money),

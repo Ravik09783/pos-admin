@@ -10,6 +10,7 @@ import {
     FileCode,
     FileType,
     Loader2,
+    MapPin,
     Package,
     Sparkles,
 } from "lucide-react"
@@ -18,11 +19,14 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useActiveBranch } from "@/lib/branch/active-branch"
 import { buildPeriod, fetchExportDataset } from "@/lib/ca-export/fetch"
 import { exportLocale } from "@/lib/ca-export/locale"
 import {
@@ -57,6 +61,9 @@ export default function CaExportPage() {
     const [data, setData] = useState<ExportDataset | null>(null)
     const [loading, setLoading] = useState(false)
     const [busy, setBusy] = useState<string | null>(null)
+    // The topbar location switcher drives what the export covers — same
+    // scoping every list page uses. "All branches" exports the whole tenant.
+    const { activeBranchId, activeBranch, branches, loading: branchLoading } = useActiveBranch()
 
     const period = useMemo(() => buildPeriod(year, month), [year, month])
     const years = useMemo(() => {
@@ -66,10 +73,13 @@ export default function CaExportPage() {
     }, [now])
 
     useEffect(() => {
+        // Wait for the branch store so the first fetch is already scoped to
+        // the saved location instead of flashing tenant-wide numbers.
+        if (branchLoading) return
         ;(async () => {
             setLoading(true)
             try {
-                const ds = await fetchExportDataset(period)
+                const ds = await fetchExportDataset(period, { branchId: activeBranchId })
                 setData(ds)
             } catch (e: unknown) {
                 toast.error(e instanceof Error ? e.message : "Failed to load data")
@@ -77,7 +87,7 @@ export default function CaExportPage() {
                 setLoading(false)
             }
         })()
-    }, [period])
+    }, [period, activeBranchId, branchLoading])
 
     // Country-driven report config. The registry decides which formats are
     // surfaced based on tenant.country — Indian restaurants see GSTR-1 JSON
@@ -118,6 +128,48 @@ export default function CaExportPage() {
 
     /** "Download everything as ZIP" card — uses the same generic builder. */
     function downloadAll() { runDownload(BUNDLE_FORMAT) }
+
+    // ── Customised bundle: pick exactly what goes inside the ZIP ─────────
+    // Country-aware: the India-only artefacts (Tally XML, GSTR-1 JSON) only
+    // appear — and only default ON — for Indian tenants; everyone always
+    // sees Excel / PDF / CSV / README. The choice maps 1:1 onto
+    // downloadCABundle()'s BundleOptions.
+    const [bundleDialogOpen, setBundleDialogOpen] = useState(false)
+    const [bundlePick, setBundlePick] = useState({
+        excel: true, pdf: true, csv: true, readme: true, tally: true, gstPortal: true,
+    })
+    const bundleChoices: Array<{ key: keyof typeof bundlePick; label: string; desc: string; indiaOnly?: boolean }> = [
+        { key: "excel", label: "Excel workbook (.xlsx)", desc: "Sales + tax working + purchases + P&L + balance sheet" },
+        { key: "pdf", label: "PDF summary", desc: "Human-readable filing summary" },
+        { key: "csv", label: "Sales register (.csv)", desc: "Raw bill rows for any spreadsheet" },
+        { key: "tally", label: "Tally XML", desc: "Sales + purchase vouchers for Tally Prime / ERP 9", indiaOnly: true },
+        { key: "gstPortal", label: "GSTR-1 JSON", desc: "GST-portal offline-utility schema", indiaOnly: true },
+        { key: "readme", label: "README.txt", desc: "Filing checklist + what each file is" },
+    ]
+    const visibleChoices = bundleChoices.filter((c) => !c.indiaOnly || loc.isIndia)
+    const nothingPicked = visibleChoices.every((c) => !bundlePick[c.key])
+
+    async function downloadCustomBundle() {
+        if (!data) return
+        setBusy("bundle-custom")
+        try {
+            const { downloadCABundle } = await import("@/lib/ca-export/bundle")
+            await downloadCABundle(data, {
+                excel: bundlePick.excel,
+                pdf: bundlePick.pdf,
+                csv: bundlePick.csv,
+                readme: bundlePick.readme,
+                tally: loc.isIndia && bundlePick.tally,
+                gstPortal: loc.isIndia && bundlePick.gstPortal,
+            })
+            toast.success("Bundle downloaded")
+            setBundleDialogOpen(false)
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : "Failed to build the bundle")
+        } finally {
+            setBusy(null)
+        }
+    }
 
     return (
         <div className="container mx-auto py-6 md:py-8 px-4 max-w-7xl space-y-6">
@@ -175,7 +227,22 @@ export default function CaExportPage() {
                      *  loads we show the FY label re-derived from the tenant's
                      *  country (Jan for US/EU, July for Australia, …). */}
                     <Badge variant="outline" className="self-end mb-2">FY {data?.period.fyLabel ?? period.fyLabel}</Badge>
+                    {/* Location scope — follows the topbar branch switcher. Only
+                     *  rendered for multi-outlet tenants; a single restaurant
+                     *  doesn't need to be told everything is "their location". */}
+                    {branches.length > 0 && (
+                        <Badge variant="outline" className="self-end mb-2">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {activeBranch?.name ?? "All locations"}
+                        </Badge>
+                    )}
                 </div>
+                {branches.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-3">
+                        Reports cover {activeBranch ? <span className="font-medium text-foreground">{activeBranch.name}</span> : "every location"} — switch the location from the selector in the top bar to export a single outlet or all of them.
+                        {activeBranch ? " Purchases, expenses and balance-sheet entries are recorded company-wide and stay included." : ""}
+                    </p>
+                )}
             </motion.div>
 
             {loading || !data ? (
@@ -242,6 +309,9 @@ export default function CaExportPage() {
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                <Button variant="outline" size="xl" onClick={() => setBundleDialogOpen(true)} disabled={busy !== null}>
+                                    Choose contents…
+                                </Button>
                                 <Button variant="neon" size="xl" onClick={downloadAll} disabled={busy !== null}>
                                     {busy === BUNDLE_FORMAT.id ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
                                     Full bundle (ZIP)
@@ -249,6 +319,51 @@ export default function CaExportPage() {
                             </div>
                         </div>
                     </motion.div>
+
+                    {/* ── Customize-bundle dialog ─────────────────────────
+                      * Pick exactly which files go inside the ZIP. The list
+                      * is country-aware: Tally + GSTR-1 rows only render for
+                      * Indian tenants; everyone gets Excel / PDF / CSV / README. */}
+                    <Dialog open={bundleDialogOpen} onOpenChange={setBundleDialogOpen}>
+                        <DialogContent className="max-w-md">
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <Package className="h-5 w-5 text-primary" /> Customize the bundle
+                                </DialogTitle>
+                            </DialogHeader>
+                            <p className="text-xs text-muted-foreground -mt-1">
+                                Pick what goes inside the ZIP for {reportConfig.countryLabel} ({data.period.label}).
+                            </p>
+                            <div className="space-y-2">
+                                {visibleChoices.map((c) => (
+                                    <label
+                                        key={c.key}
+                                        className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2.5 cursor-pointer hover:border-primary/40 transition-colors"
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-medium">{c.label}</div>
+                                            <div className="text-[11px] text-muted-foreground">{c.desc}</div>
+                                        </div>
+                                        <Switch
+                                            checked={bundlePick[c.key]}
+                                            onCheckedChange={(v) => setBundlePick((p) => ({ ...p, [c.key]: v }))}
+                                        />
+                                    </label>
+                                ))}
+                            </div>
+                            <DialogFooter>
+                                <Button
+                                    variant="neon"
+                                    onClick={downloadCustomBundle}
+                                    disabled={busy !== null || nothingPicked}
+                                    title={nothingPicked ? "Pick at least one file" : undefined}
+                                >
+                                    {busy === "bundle-custom" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                                    Download ZIP
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
 
                     {/* Country-aware format cards. The labels reflect what the
                      *  tenant's tax authority actually accepts ("GSTR-1 JSON"

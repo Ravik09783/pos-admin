@@ -2,7 +2,7 @@
 
 import ExcelJS from "exceljs"
 
-import { exportLocale, taxCells, type ExportLocale } from "./locale"
+import { BRANCH_SCOPE_NOTE, exportLocale, scopeLabel, showBranchColumn, taxCells, type ExportLocale } from "./locale"
 import type { ExportDataset } from "./types"
 
 const HEADER_FILL: ExcelJS.Fill = {
@@ -70,6 +70,8 @@ function addCoverSheet(wb: ExcelJS.Workbook, data: ExportDataset, loc: ExportLoc
     }
 
     put("Country", loc.cfg.name)
+    const location = scopeLabel(data)
+    if (location) put("Location", location)
     put("Period", data.period.label)
     put("FY", data.period.fyLabel)
     put(loc.taxIdLabel, data.tenant.gstin ?? "—")
@@ -82,6 +84,11 @@ function addCoverSheet(wb: ExcelJS.Workbook, data: ExportDataset, loc: ExportLoc
         put("State", `${data.tenant.state ?? ""} (${data.tenant.state_code ?? ""})`)
     }
     put("Address", `${data.tenant.address ?? ""}${data.tenant.city ? ", " + data.tenant.city : ""}${data.tenant.pincode ? " - " + data.tenant.pincode : ""}`)
+    if (data.branch) {
+        s.getCell(`A${r}`).value = BRANCH_SCOPE_NOTE
+        s.getCell(`A${r}`).font = { italic: true, color: { argb: "FF888888" } }
+        r++
+    }
     r++
     s.getCell(`A${r}`).value = loc.isIndia
         ? "GSTR-1 / 3B working summary"
@@ -139,11 +146,13 @@ function addSalesRegister(wb: ExcelJS.Workbook, data: ExportDataset, loc: Export
     const s = wb.addWorksheet("Sales Register", { properties: { tabColor: { argb: "FF2E75B6" } } })
 
     const taxKeys = loc.taxColumns.map((_, i) => `tax${i}`)
+    const withBranch = showBranchColumn(data)
     const cols: Partial<ExcelJS.Column>[] = [
         { header: "Invoice #", key: "inv", width: 18 },
         { header: "Date", key: "date", width: 12 },
-        { header: "Customer", key: "cust", width: 20 },
     ]
+    if (withBranch) cols.push({ header: "Branch", key: "branch", width: 18 })
+    cols.push({ header: "Customer", key: "cust", width: 20 })
     if (loc.taxModel !== "none") {
         cols.push({ header: `Customer ${loc.taxIdLabel}`, key: "cgstin", width: 18 })
     }
@@ -167,6 +176,7 @@ function addSalesRegister(wb: ExcelJS.Workbook, data: ExportDataset, loc: Export
         s.addRow({
             inv: r.invoice_number,
             date: new Date(r.invoice_date),
+            ...(withBranch ? { branch: r.branch_name ?? "—" } : {}),
             cust: r.customer_name ?? "Walk-in",
             cgstin: r.customer_gstin ?? "",
             pos: r.place_of_supply ?? "",
@@ -192,11 +202,13 @@ function addItemDetail(wb: ExcelJS.Workbook, data: ExportDataset, loc: ExportLoc
     const s = wb.addWorksheet("Sales Item Detail", { properties: { tabColor: { argb: "FF9DC3E6" } } })
 
     const taxKeys = loc.taxColumns.map((_, i) => `tax${i}`)
+    const withBranch = showBranchColumn(data)
     const cols: Partial<ExcelJS.Column>[] = [
         { header: "Invoice #", key: "inv", width: 18 },
         { header: "Date", key: "date", width: 12 },
-        { header: "Item", key: "item", width: 32 },
     ]
+    if (withBranch) cols.push({ header: "Branch", key: "branch", width: 18 })
+    cols.push({ header: "Item", key: "item", width: 32 })
     if (loc.isIndia) cols.push({ header: "HSN/SAC", key: "hsn", width: 12 })
     cols.push({ header: "Qty", key: "qty", width: 8 })
     cols.push({ header: "Rate", key: "rate", width: 12 })
@@ -214,6 +226,7 @@ function addItemDetail(wb: ExcelJS.Workbook, data: ExportDataset, loc: ExportLoc
             s.addRow({
                 inv: r.invoice_number,
                 date: new Date(r.invoice_date),
+                ...(withBranch ? { branch: r.branch_name ?? "—" } : {}),
                 item: it.item_name,
                 hsn: it.hsn_code ?? "",
                 qty: it.quantity,

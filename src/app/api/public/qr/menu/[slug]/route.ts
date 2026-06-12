@@ -3,6 +3,8 @@ import { unstable_cache } from "next/cache"
 
 import { createServiceRoleClient } from "@/lib/supabase/server"
 import { resolveGateway } from "@/lib/payments/gateway"
+import { phonepeEnvCreds, resolveTenantPhonePeCreds, type TenantPhonePeRow } from "@/lib/billing/phonepe"
+import { paytmEnvCreds, resolveTenantPaytmCreds, type TenantPaytmRow } from "@/lib/billing/paytm"
 
 /**
  * GET /api/public/qr/menu/:slug
@@ -51,14 +53,27 @@ async function loadPublicMenu(slug: string, tableNumber: string | null) {
     const gateway = resolveGateway(t.country, t.payment_gateway)
 
     let phonepeReady = false
+    let paytmReady = false
     let stripeReady = false
     if (gateway === "phonepe") {
-        // PhonePe rail isn't built yet (Phase 2 of the gateway
-        // rework). For now we report "ready" whenever the tenant has
-        // a UPI id configured — the QR-ordering flow gracefully
-        // downgrades to plain manual UPI in that case so customers
-        // can still pay via screenshot.
-        phonepeReady = Boolean(t.upi_id)
+        // Ready when the tenant's PhonePe credentials resolve (per-tenant or
+        // platform .env) OR a plain UPI id exists — place-order downgrades to
+        // manual-UPI screenshots in the latter case, so ordering still works.
+        const { data: gw } = await supabase
+            .from("tenant_payment_gateways")
+            .select("phonepe_mid, phonepe_merchant_key, phonepe_salt_index, phonepe_mid_staging, phonepe_merchant_key_staging, phonepe_salt_index_staging, phonepe_enabled, phonepe_env")
+            .eq("tenant_id", t.id)
+            .maybeSingle()
+        phonepeReady = Boolean(resolveTenantPhonePeCreds(gw as TenantPhonePeRow | null) ?? phonepeEnvCreds()) || Boolean(t.upi_id)
+    } else if (gateway === "paytm") {
+        // Same readiness contract as PhonePe: real creds OR the manual-UPI
+        // fallback id.
+        const { data: gw } = await supabase
+            .from("tenant_payment_gateways")
+            .select("paytm_mid, paytm_merchant_key, paytm_mid_staging, paytm_merchant_key_staging, paytm_enabled, paytm_env")
+            .eq("tenant_id", t.id)
+            .maybeSingle()
+        paytmReady = Boolean(resolveTenantPaytmCreds(gw as TenantPaytmRow | null) ?? paytmEnvCreds()) || Boolean(t.upi_id)
     } else if (gateway === "stripe" && process.env.STRIPE_SECRET_KEY) {
         const { data: gw } = await supabase
             .from("tenant_payment_gateways")
@@ -121,6 +136,7 @@ async function loadPublicMenu(slug: string, tableNumber: string | null) {
                 ...tenant,
                 payment_gateway: gateway,
                 phonepe_ready: phonepeReady,
+                paytm_ready: paytmReady,
                 stripe_ready: stripeReady,
             },
             categories: cats ?? [],

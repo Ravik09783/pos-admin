@@ -91,7 +91,15 @@ async function recheckOnline(tenantId: string, onTransitionOnline: () => void) {
 function startHealthProbe(tenantId: string, onTransitionOnline: () => void) {
     if (probeStarted || !tenantId) return
     probeStarted = true
-    void recheckOnline(tenantId, onTransitionOnline)
+    // First probe after a page load: `onlineState` initialises to true, so
+    // booting already-online never counts as a "transition" — which used to
+    // strand bills queued in a previous offline session (billed offline →
+    // network returned → user refreshed → nothing auto-synced). Run the
+    // transition work once whenever the first probe lands online: refill is
+    // idempotent and the sync handler no-ops on an empty queue.
+    void recheckOnline(tenantId, onTransitionOnline).then((ok) => {
+        if (ok) onTransitionOnline()
+    })
     probeInterval = setInterval(() => {
         void recheckOnline(tenantId, onTransitionOnline)
     }, HEALTH_CHECK_INTERVAL_MS)

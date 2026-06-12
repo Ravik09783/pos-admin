@@ -59,6 +59,19 @@ export default function PayslipsPage() {
         [slips, canManage],
     )
 
+    // Hero numbers for the personal view: the latest month's net pay and
+    // the calendar-year running total — the two questions an employee
+    // actually opens this screen with.
+    const heroStats = useMemo(() => {
+        if (canManage || visible.length === 0) return null
+        const latest = visible[0]   // already sorted period_month desc
+        const year = latest.period_month.slice(0, 4)
+        const ytd = visible
+            .filter((s) => s.period_month.startsWith(year))
+            .reduce((sum, s) => sum + Number(s.net_pay), 0)
+        return { latest, ytd, year }
+    }, [visible, canManage])
+
     async function download(slip: HrPayslip) {
         const emp = empById.get(slip.employee_id)
         if (!tenant || !emp) return toast.error("Missing employee details")
@@ -87,6 +100,30 @@ export default function PayslipsPage() {
                     ? "Every generated payslip across the team. Generate and finalise on the Payroll screen."
                     : "Your salary slips. Download any month as a PDF."}
             />
+
+            {/* Personal hero strip — latest net pay + year-to-date, with a
+              * one-tap download of the newest slip. */}
+            {heroStats && (
+                <div className="grid sm:grid-cols-3 gap-2.5">
+                    <div className="rounded-xl border border-primary/30 bg-primary/[0.06] px-4 py-3 sm:col-span-2">
+                        <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Latest · {periodLabel(heroStats.latest.period_month)}
+                        </div>
+                        <div className="mt-1 flex items-center justify-between gap-3 flex-wrap">
+                            <span className="text-3xl font-bold tabular-nums text-primary">{money(heroStats.latest.net_pay)}</span>
+                            <Button size="sm" variant="neon" className="h-8" onClick={() => download(heroStats.latest)}>
+                                <Download className="h-3.5 w-3.5" /> Download
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                        <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            {heroStats.year} so far · {visible.filter((s) => s.period_month.startsWith(heroStats.year)).length} slips
+                        </div>
+                        <div className="mt-1 text-3xl font-bold tabular-nums">{money(heroStats.ytd)}</div>
+                    </div>
+                </div>
+            )}
 
             <Card>
                 <CardHeader className="py-3">

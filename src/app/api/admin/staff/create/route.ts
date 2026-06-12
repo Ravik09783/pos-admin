@@ -102,19 +102,8 @@ export async function POST(req: Request) {
         }, { status: 403 })
     }
 
-    // ── Plan-cap pre-flight ─────────────────────────────────────────────
-    if (body.branch_id) {
-        const { data: ok, error: capErr } = await supabase.rpc(
-            "can_invite_staff" as never,
-            { p_branch_id: body.branch_id } as never,
-        )
-        if (!capErr && ok === false) {
-            return NextResponse.json({
-                error: "Your plan has reached its staff-per-outlet limit. Upgrade your plan or pick a different outlet.",
-                code: "plan_limit",
-            }, { status: 403 })
-        }
-    }
+    // Staff seats are unlimited on every plan (migration 59) — no plan-cap
+    // pre-flight. Branch limits are enforced where branches are created.
 
     // ── Step 1. auth.admin.createUser ──────────────────────────────────
     const admin = createServiceRoleClient()

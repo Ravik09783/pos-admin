@@ -22,8 +22,9 @@ export const SITE_TAGLINE = "Cloud Restaurant POS & GST Billing Software"
 export const SITE_DESCRIPTION =
     "RestoPOS is a cloud restaurant POS & billing software — fast invoicing, "
     + "QR table ordering, a realtime kitchen display (KDS), GST / VAT / "
-    + "sales-tax-ready bills, UPI & card payments, loyalty, gift cards and "
-    + "AI-style analytics. Run one cafe or a whole chain. Start a free trial."
+    + "sales-tax-ready bills, PhonePe & Paytm UPI + card payments, staff "
+    + "attendance & payroll with salary slips, loyalty and AI-style "
+    + "analytics. Run one cafe or a whole chain. Start a free trial."
 
 /**
  * Keyword set surfaced as `<meta name="keywords">` and reflected through
@@ -42,7 +43,9 @@ export const SITE_KEYWORDS: string[] = [
     "QR menu", "QR code menu", "QR table ordering", "scan to order",
     "contactless ordering", "kitchen display system", "KDS",
     "kitchen order ticket", "KOT", "restaurant invoicing",
-    "UPI payments", "PhonePe POS", "PhonePe UPI", "card payments restaurant",
+    "UPI payments", "PhonePe POS", "PhonePe UPI", "Paytm POS", "Paytm UPI",
+    "card payments restaurant", "staff attendance software", "restaurant payroll",
+    "salary slip generator", "geofenced attendance",
     "cafe POS", "bar POS", "QSR POS", "quick service restaurant software",
     "fine dining POS", "cloud kitchen software", "cloud kitchen POS",
     "dhaba billing software", "hotel POS", "takeaway POS", "food court POS",
@@ -54,6 +57,9 @@ export const SITE_KEYWORDS: string[] = [
     "stock management", "recipe management", "CA export", "accountant export",
     "offline billing POS", "Petpooja alternative", "restaurant software",
     "food business software", "multi country POS", "VAT POS",
+    "customer display screen POS", "Swiggy settlement reconciliation",
+    "Zomato commission tracking", "restaurant accounting software",
+    "bank reconciliation restaurant", "Google Pay UPI POS",
 ]
 
 /** The product capabilities — used in JSON-LD `featureList` and the OG image. */
@@ -62,13 +68,19 @@ export const SITE_FEATURES: string[] = [
     "QR code table ordering — scan to order",
     "Realtime kitchen display system (KDS)",
     "Country-aware tax engine — GST, VAT & sales tax in 30+ countries",
-    "PhonePe UPI, card & cash payments with auto-confirmation",
-    "Multi-branch / multi-outlet management",
+    "PhonePe & Paytm UPI (pay from any UPI app incl. Google Pay), card & cash payments with auto-confirmation",
+    "Staff attendance with geofenced punch in/out + payroll & salary slips",
+    "Unlimited staff accounts on every plan",
+    "Multi-branch / multi-outlet management with one-click location switch",
+    "Customer-facing display screen per counter",
+    "Swiggy & Zomato commission and settlement tracking",
+    "Accounting, expenses & bank reconciliation",
     "Loyalty, gift cards & coupons",
     "Sales analytics & AI-style demand forecasting",
-    "Inventory & recipe management",
+    "Per-location reports downloadable as CSV, Excel or PDF",
+    "Inventory, vendor & purchase management",
     "Offline-capable billing",
-    "One-click CA / accountant export",
+    "One-click CA / accountant export — per outlet or all locations",
 ]
 
 /**
@@ -85,7 +97,9 @@ export const SITE_FAQ: ReadonlyArray<{ q: string; a: string }> = [
     { q: "Can I use this on a phone?", a: "Yes. Every page is mobile-responsive. Some restaurants run their POS entirely off Android tablets and waiters take orders on phones." },
     { q: "What about hardware — printers, cash drawers?", a: "Standard ESC/POS thermal printers (58mm or 80mm) work via Web Bluetooth, USB, or LAN. Cash drawers connect via the printer." },
     { q: "Is my data safe?", a: "Yes. Multi-tenant isolation is enforced at the database level via Supabase RLS — staff can never see another restaurant's data, even via a malicious SQL query. All payments are via verified webhook signatures." },
-    { q: "How do payments work — does the money come to me?", a: "Yes, directly. In India you connect your own PhonePe Business account (free) — paste your MID + Merchant Key into our settings, and customers pay you by UPI. Money lands in your bank account; we never touch the funds. UPI is 0% MDR (effectively free)." },
-    { q: "What happens if my internet drops mid-shift?", a: "We're a PWA — recently-cached pages keep working. Orders queued offline sync when you reconnect. For real-money transactions you'll need internet, same as any UPI flow." },
-    { q: "Can I export my data?", a: "Yes. Every list page has CSV export. The CA Export gives you bulk Excel/Tally/JSON for monthly filings. You own all your data; we'll never lock you in." },
+    { q: "How do payments work — does the money come to me?", a: "Yes, directly. In India you connect your own PhonePe Business or Paytm Business account (free) — paste your merchant credentials into our settings, and customers pay you from any UPI app (Google Pay, PhonePe, Paytm, BHIM) with automatic confirmation. Money lands in your bank account; we never touch the funds. UPI is 0% MDR (effectively free). Outside India, Stripe handles cards in 135+ currencies. Only a plain UPI ID? That works too — staff confirm payments manually." },
+    { q: "Can I run multiple outlets / branches?", a: "Yes. Add branches in Settings and switch between them (or view all at once) from one selector in the top bar — menus, orders, bills, staff visibility and reports all re-scope instantly. You can copy a menu to a new outlet in one click, and reports + the CA Export can be downloaded per location or for the whole chain. Plans differ only in how many outlets they include." },
+    { q: "Can I track staff attendance and pay salaries?", a: "Yes — built in, with unlimited staff on every plan. Staff punch in/out from their phone, and you can pin your outlet's location so punches only count within ~50 metres of the restaurant. Forgot to punch out? The system closes the shift automatically. Month-end, generate professional salary slips (monthly, daily-wage, or hourly staff) that employees download themselves as PDFs." },
+    { q: "What happens if my internet drops mid-shift?", a: "We're a PWA — recently-cached pages keep working. You keep billing with real, pre-reserved invoice numbers; queued bills sync automatically when you reconnect, and duplicates are physically impossible. For real-money UPI transactions you'll need internet, same as any UPI flow." },
+    { q: "Can I export my data and reports?", a: "Yes. Sales reports download as CSV, Excel or PDF — scoped to one location or all of them. The CA Export gives you bulk Excel/Tally XML/GST-portal JSON/PDF for monthly filings, per outlet or chain-wide, with a customisable ZIP bundle. You own all your data; we'll never lock you in." },
 ]

@@ -4,9 +4,10 @@ import Link from "next/link"
 import dynamic from "next/dynamic"
 import { motion } from "framer-motion"
 import {
-    ArrowRight, BarChart3, Brain, Calendar, Camera, Check, ChefHat, Gift,
-    Globe, Lock, Mail, MapPin, Menu, MessageCircle, Phone, Receipt,
-    Sparkles, Star, Wallet, X, Zap,
+    ArrowRight, BarChart3, Bike, Boxes, Brain, Building2, Calendar, Camera,
+    Check, ChefHat, Gift, Globe, Landmark, Lock, Mail, MapPin, Menu,
+    MessageCircle, Monitor, Phone, Receipt, ShieldCheck, Sparkles, Star,
+    Users, Wallet, WifiOff, X, Zap,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
@@ -224,7 +225,7 @@ export function Hero() {
                         transition={{ duration: 0.7, delay: 0.7, ease: [0.16, 1, 0.3, 1] }}
                         className="mt-6 text-lg text-muted-foreground max-w-xl text-balance"
                     >
-                        Browser-based POS with built-in tax — GST, VAT or sales tax, tuned to your country, currency and fiscal year. Generate bills, run your kitchen, take QR orders. In India? Export everything your CA needs in one click — GSTR-1, GSTR-3B, P&amp;L and Balance Sheet.
+                        Browser-based POS with built-in tax — GST, VAT or sales tax, tuned to your country, currency and fiscal year. Generate bills, run your kitchen, take QR orders with auto-confirmed UPI (PhonePe or Paytm — customers pay from any UPI app, Google Pay included), and manage staff attendance &amp; salary slips — unlimited staff on every plan. Run one outlet or a whole chain: switch locations with one click and every menu, order and report re-scopes. In India? Export everything your CA needs in one click — GSTR-1, GSTR-3B, P&amp;L and Balance Sheet — per location or all together.
                     </motion.p>
 
                     <motion.div
@@ -320,12 +321,20 @@ export function Features() {
         { icon: Lock, title: "Bill Lock Security", desc: "Once a bill is generated, only the Owner can edit. Every change goes to an immutable audit log." },
         { icon: ChefHat, title: "Realtime Kitchen Display", desc: "Orders fly to the kitchen via WebSockets. Color-coded urgency. Multi-station routing." },
         { icon: Wallet, title: "Country-aware Tax Engine", desc: "GST, VAT or sales tax — computed per item, rounded correctly, inter-state / inter-region aware. Pick your country; we ship the rates (India, US states, EU, Gulf & more)." },
-        { icon: Receipt, title: "QR Table Ordering", desc: "Guests scan, browse, pay online — UPI via PhonePe or card — order auto-flows to your KDS. No app install, prices in your currency." },
+        { icon: Receipt, title: "QR Table Ordering", desc: "Guests scan, browse, pay online — UPI via PhonePe / Paytm in India, Stripe cards abroad — and the order auto-flows to your KDS. No app install, prices in your currency." },
+        { icon: Zap, title: "UPI Auto-Confirm Payments", desc: "Connect PhonePe or Paytm Business — customers scan a dynamic QR from any UPI app (Google Pay, PhonePe, Paytm, BHIM), money settles to your own bank, and the bill confirms itself the moment they pay. Plain-UPI fallback included." },
+        { icon: Building2, title: "Multi-Outlet Management", desc: "Add branches as you grow. One switcher in the top bar re-scopes the whole app — menus, orders, bills, reports — to a location. Copy a menu to a new outlet in one click; staff stay pinned to theirs." },
+        { icon: Users, title: "Staff Attendance & Payroll", desc: "Geofenced punch in/out (staff must be within ~50 m of your outlet), auto-checkout for forgotten punch-outs, monthly sheets, leaves & holidays — and one-click professional salary-slip PDFs." },
+        { icon: WifiOff, title: "Offline-Proof Billing", desc: "Internet down mid-shift? Keep billing with real pre-reserved invoice numbers; everything syncs back automatically — duplicates are physically impossible." },
+        { icon: Boxes, title: "Inventory, Vendors & Purchases", desc: "Track stock, manage vendors, and log purchase invoices with input-tax-credit flags — your purchase register flows straight into the accountant export." },
+        { icon: Landmark, title: "Accounting & Bank Reconciliation", desc: "Expenses by P&L group, balance-sheet inputs, a payments dashboard, and statement-vs-system bank reconciliation — light bookkeeping inside the POS." },
+        { icon: Monitor, title: "Customer-Facing Display", desc: "A second screen per counter mirrors the cart live as the cashier rings up, then shows the payment QR. Any tablet with a browser works — no extra hardware." },
+        { icon: Bike, title: "Swiggy & Zomato Tracking", desc: "Tag aggregator orders, track commission and expected payouts per platform, and reconcile their monthly settlements against your own numbers." },
         { icon: Brain, title: "AI-style Insights", desc: "Anomaly detection, demand forecasting, customer win-back signals — all driven by your own data, no paid LLMs." },
         { icon: Gift, title: "Loyalty + Coupons", desc: "Auto-tiered loyalty (Bronze→Platinum), promo codes, gift cards, birthday + anniversary auto-greetings." },
         { icon: Calendar, title: "Reservations", desc: "Book up to 30 days in advance. Walk-in waitlist. Status flow from confirmed to seated to completed." },
-        { icon: BarChart3, title: "Live Reports", desc: "Hourly heatmaps, top items, payment splits, day-of-week trends. Filter by any date range." },
-        { icon: Zap, title: "PhonePe UPI Direct", desc: "Customers scan a UPI QR; money lands directly in your bank — webhook-confirmed, zero manual screenshot review." },
+        { icon: ShieldCheck, title: "Roles & Granular Permissions", desc: "Owner, manager, cashier, kitchen and more out of the box — or build custom role templates with per-permission overrides. Staff see their own branch; admins see everything." },
+        { icon: BarChart3, title: "Live Reports, Any Format", desc: "Hourly heatmaps, top items, payment splits, daily trends — filtered by location and any date range, downloadable as CSV, Excel or PDF." },
     ]
     return (
         <section id="features" className="container mx-auto px-4 py-20 md:py-28">
@@ -458,7 +467,9 @@ export function ComparisonTable() {
         { label: "1-click CA export (GSTR-1 + 3B + P&L + BS)", us: true, petpooja: false, posist: false },
         { label: "Realtime KDS via WebSockets", us: true, petpooja: true, posist: true },
         { label: "QR table ordering (PWA)", us: true, petpooja: "partial", posist: true },
-        { label: "Built-in PhonePe UPI payments", us: true, petpooja: false, posist: false },
+        { label: "Built-in UPI payments (PhonePe + Paytm)", us: true, petpooja: false, posist: false },
+        { label: "Geofenced staff attendance + salary slips", us: true, petpooja: false, posist: false },
+        { label: "Unlimited staff accounts on every plan", us: true, petpooja: false, posist: false },
         { label: "Demand forecasting + insights", us: true, petpooja: false, posist: false },
         { label: "Tiered loyalty + gift cards + coupons", us: true, petpooja: true, posist: true },
         { label: "Bank reconciliation", us: true, petpooja: false, posist: false },
@@ -653,10 +664,14 @@ export function Pricing() {
                                     </div>
                                     <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5 flex-wrap">
                                         <Badge variant="outline" className="text-[10px]">
-                                            {plan.maxBranches} outlet{plan.maxBranches > 1 ? "s" : ""}
+                                            {Number.isFinite(plan.maxBranches)
+                                                ? `${plan.maxBranches} outlet${plan.maxBranches > 1 ? "s" : ""}`
+                                                : "Unlimited outlets"}
                                         </Badge>
                                         <Badge variant="outline" className="text-[10px]">
-                                            {plan.maxStaffPerBranch} staff / outlet
+                                            {Number.isFinite(plan.maxStaffPerBranch)
+                                                ? `${plan.maxStaffPerBranch} staff / outlet`
+                                                : "Unlimited staff"}
                                         </Badge>
                                     </div>
                                 </div>
@@ -686,7 +701,7 @@ export function Pricing() {
                 transition={{ delay: 0.4 }}
                 className="text-center text-xs text-muted-foreground mt-10"
             >
-                30-day free trial · No credit card required · Cancel anytime · Owner counts as the first staff seat
+                30-day free trial · No credit card required · Cancel anytime · Unlimited staff accounts on every plan
             </motion.p>
         </section>
     )

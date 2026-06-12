@@ -52,13 +52,16 @@ interface TenantLite {
     id: string; name: string; slug: string;
     upi_id: string | null; upi_payee_name: string | null;
     qr_ordering_enabled: boolean; qr_require_payment: boolean;
-    payment_gateway?: "manual" | "phonepe" | "stripe";
+    payment_gateway?: "manual" | "phonepe" | "paytm" | "stripe";
     /** True when the restaurant can take online payment on the "phonepe"
      *  gateway — PhonePe is connected (per-tenant or the platform .env
      *  fallback) OR, since the flow downgrades gracefully, a plain UPI id
      *  is set. When false on a "phonepe" gateway, the page shows a "payment
      *  not set up" message and blocks ordering. */
     phonepe_ready?: boolean;
+    /** Same contract for the "paytm" gateway: Paytm creds resolve OR a
+     *  plain UPI id exists for the manual downgrade. */
+    paytm_ready?: boolean;
     /** Same idea for Stripe — true when platform Stripe key is set + the
      *  restaurant has a Stripe-connected account. Customer page redirects
      *  to Stripe Checkout when this is true; blocks with a "set up online
@@ -296,6 +299,22 @@ export default function QRMenuPage() {
         if (!tenant) return
         let cancelled = false
         ;(async () => {
+            // Stripe Checkout bounce-back with ?cancelled=<orderId>: the
+            // customer bailed without paying. Without this, the restore
+            // below would land them on the "Verifying with restaurant…"
+            // screen forever for an order that was never paid. Drop the
+            // persisted order and let them start fresh (the abandoned
+            // ON_HOLD order is swept by the periodic cleanup).
+            const sp = new URLSearchParams(window.location.search)
+            if (sp.get("cancelled")) {
+                clearPersistedOrder(params.tenantSlug, params.tableNum)
+                window.history.replaceState(null, "", window.location.pathname)
+                toast.message("Payment cancelled — nothing was charged.", {
+                    description: "Your order wasn't placed. Order again whenever you're ready.",
+                })
+                setRestoring(false)
+                return
+            }
             const persisted = readPersistedOrder(params.tenantSlug, params.tableNum)
             if (!persisted) {
                 setRestoring(false)
@@ -790,6 +809,7 @@ export default function QRMenuPage() {
     // elsewhere); we just check the matching readiness flag.
     const gatewayUnready =
         (tenant.payment_gateway === "phonepe"  && tenant.phonepe_ready  === false) ||
+        (tenant.payment_gateway === "paytm" && tenant.paytm_ready === false) ||
         (tenant.payment_gateway === "stripe" && tenant.stripe_ready === false)
     if (menuLoadStatus === "ok" && stage === "browse" && gatewayUnready) {
         return (
@@ -1182,7 +1202,7 @@ export default function QRMenuPage() {
                         <div className="font-bold text-lg leading-tight truncate text-gradient">{tenant.name}</div>
                         <div className="text-xs text-muted-foreground flex items-center gap-1">
                             <Badge variant="outline" className="text-[10px] py-0 px-1.5">Table {params.tableNum}</Badge>
-                            {tenant.payment_gateway === "phonepe" && (
+                            {(tenant.payment_gateway === "phonepe" || tenant.payment_gateway === "paytm") && (
                                 <Badge variant="neon" className="text-[10px] py-0 px-1.5"><Zap className="h-2.5 w-2.5 mr-0.5" />Instant</Badge>
                             )}
                         </div>
@@ -1470,9 +1490,9 @@ export default function QRMenuPage() {
                                         {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
                                         Place order &amp; pay {money(grandTotal)}
                                     </Button>
-                                    {tenant.payment_gateway === "phonepe" && (
+                                    {(tenant.payment_gateway === "phonepe" || tenant.payment_gateway === "paytm") && (
                                         <p className="text-[10px] text-center text-muted-foreground mt-2">
-                                            ⚡ Instant confirmation · UPI via PhonePe
+                                            ⚡ Instant confirmation · UPI via {tenant.payment_gateway === "paytm" ? "Paytm" : "PhonePe"}
                                         </p>
                                     )}
                                 </>

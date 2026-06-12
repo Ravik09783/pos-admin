@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Building2, Loader2, Pencil, Plus, Trash2 } from "lucide-react"
+import { Building2, Loader2, MapPin, Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -35,6 +35,11 @@ const EMPTY_FORM = {
     pan: "",
     fssai: "",
     is_main: false,
+    // Geofenced attendance pin (migration 60). Strings in the form;
+    // parsed + validated on save. Empty = no geofence.
+    latitude: "",
+    longitude: "",
+    geofence_radius_m: "50",
 }
 
 export default function BranchesPage() {
@@ -126,8 +131,31 @@ export default function BranchesPage() {
             pan: tax?.pan ?? "",
             fssai: tax?.fssai ?? "",
             is_main: b.is_main ?? false,
+            latitude: b.latitude != null ? String(b.latitude) : "",
+            longitude: b.longitude != null ? String(b.longitude) : "",
+            geofence_radius_m: String(b.geofence_radius_m ?? 50),
         })
         setOpen(true)
+    }
+
+    /** Fill the geofence pin from the device's current position — the owner
+     *  stands at the counter and taps once instead of hunting coordinates. */
+    function useMyLocation() {
+        if (typeof navigator === "undefined" || !navigator.geolocation) {
+            return toast.error("This browser can't access location.")
+        }
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setForm((f) => ({
+                    ...f,
+                    latitude: pos.coords.latitude.toFixed(6),
+                    longitude: pos.coords.longitude.toFixed(6),
+                }))
+                toast.success("Location captured — save to apply.")
+            },
+            () => toast.error("Couldn't read your location — allow location access and try again."),
+            { enableHighAccuracy: true, timeout: 10000 },
+        )
     }
 
     async function save(e: React.FormEvent) {
@@ -162,6 +190,17 @@ export default function BranchesPage() {
             if (form.pan && !/^[A-Z]{5}\d{4}[A-Z]$/.test(form.pan)) return toast.error("PAN format looks wrong")
             if (form.pincode && !/^\d{6}$/.test(form.pincode)) return toast.error("PIN code should be 6 digits")
         }
+        // Geofence pin: both coordinates or neither; sane ranges.
+        const lat = form.latitude.trim() ? Number(form.latitude) : null
+        const lng = form.longitude.trim() ? Number(form.longitude) : null
+        const radius = Math.round(Number(form.geofence_radius_m) || 50)
+        if ((lat == null) !== (lng == null)) {
+            return toast.error("Enter both latitude and longitude (or clear both to disable the geofence).")
+        }
+        if (lat != null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) return toast.error("Latitude must be between -90 and 90.")
+        if (lng != null && (!Number.isFinite(lng) || lng < -180 || lng > 180)) return toast.error("Longitude must be between -180 and 180.")
+        if (lat != null && (radius < 10 || radius > 5000)) return toast.error("Geofence radius should be 10–5000 metres.")
+
         setBusy(true)
         const st = cfg.states?.find((s) => s.code === form.state_code)
         const isMain = form.is_main || (!editingId && branches.length === 0)
@@ -176,6 +215,9 @@ export default function BranchesPage() {
             city: form.city || null,
             pincode: form.pincode || null,
             address_line1: form.address_line1 || null,
+            latitude: lat,
+            longitude: lng,
+            geofence_radius_m: radius,
             is_main: isMain,
             ...(editingId ? {} : { is_active: true }),
         }
@@ -363,6 +405,38 @@ export default function BranchesPage() {
                         </div>
                         <div className="space-y-1.5"><Label>City</Label><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
                         <div className="space-y-1.5"><Label>Address</Label><Input value={form.address_line1} onChange={(e) => setForm({ ...form, address_line1: e.target.value })} /></div>
+
+                        {/* ── Attendance geofence ───────────────────────────
+                          * Pin the outlet; staff can then self-punch only
+                          * within the radius (enforced server-side in
+                          * hr_self_punch). Clear both fields to disable. */}
+                        <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <div>
+                                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Attendance geofence</div>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                        Staff can punch in/out only within this radius of the pin. Leave blank to allow from anywhere.
+                                    </p>
+                                </div>
+                                <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={useMyLocation}>
+                                    <MapPin className="h-3.5 w-3.5" /> Use my location
+                                </Button>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs">Latitude</Label>
+                                    <Input inputMode="decimal" placeholder="28.6139" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs">Longitude</Label>
+                                    <Input inputMode="decimal" placeholder="77.2090" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs">Radius (m)</Label>
+                                    <Input inputMode="numeric" value={form.geofence_radius_m} onChange={(e) => setForm({ ...form, geofence_radius_m: e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
                         <div className="space-y-1.5">
                             <Label>{cfg.taxIdLabel}{cfg.taxIdRequired ? " *" : ""}</Label>
                             <Input

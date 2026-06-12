@@ -21,10 +21,12 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ArrowUpRight, LayoutGrid } from "lucide-react"
+import { useState } from "react"
+import { ArrowUpRight, LayoutGrid, Search } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { useMyPermissions } from "@/lib/rbac/use-permissions"
 import { cn } from "@/lib/utils"
 import type { UserRole } from "@/types/database"
@@ -211,6 +213,10 @@ export function MenuCards({ onNavigate, compact }: MenuCardsProps) {
     const pending = usePendingCount()
     const unread = useUnreadPostCount()
     const { role, can, loading } = useMyPermissions()
+    // Launcher-wide tool search — typing filters every card by label, so
+    // "pay" finds Payments dashboard / Payment gateway / Payslips without
+    // scrolling seven section panels. Empty = the normal grouped view.
+    const [query, setQuery] = useState("")
 
     if (loading || !role) {
         return <div className="text-sm text-muted-foreground py-8 text-center">Loading…</div>
@@ -219,6 +225,10 @@ export function MenuCards({ onNavigate, compact }: MenuCardsProps) {
     const allVisible = filterNavForUser(role, can)
     const itemByHref = new Map(allVisible.map((i) => [i.href, i]))
     const groups = groupBySection(allVisible)
+    const q = query.trim().toLowerCase()
+    const searchResults = q
+        ? allVisible.filter((i) => i.label.toLowerCase().includes(q) || (i.section ?? "").toLowerCase().includes(q))
+        : []
 
     // Pinned set, with the role's preferred order, dropping anything the
     // current user can't see. Empty for a brand-new role we forgot to
@@ -252,11 +262,84 @@ export function MenuCards({ onNavigate, compact }: MenuCardsProps) {
 
     return (
         <div className={cn("space-y-6 md:space-y-8", compact && "space-y-4")}>
+            {/* ── Find a tool + section quick-jump ──────────────────────
+              * One search box filters every card by name; the chip row
+              * jumps straight to a section panel. Together they make the
+              * launcher navigable without scrolling. Skipped in compact
+              * (dialog) mode where the grid is already small. */}
+            {!compact && (
+                <div className="space-y-2.5">
+                    <div className="relative max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Find a tool… (POS, payslips, reports)"
+                            className="pl-9 h-10 bg-card/60"
+                            aria-label="Search tools"
+                        />
+                    </div>
+                    {!q && groups.length > 1 && (
+                        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                            {groups.map((g) => {
+                                const accent = SECTION_ACCENT[g.section] ?? SECTION_ACCENT.Setup!
+                                return (
+                                    <button
+                                        key={g.section}
+                                        type="button"
+                                        onClick={() => document.getElementById(`launcher-${g.section}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                                        className={cn(
+                                            "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
+                                            "transition-colors hover:border-primary/50 hover:text-foreground text-muted-foreground",
+                                            accent.panelBorder,
+                                        )}
+                                    >
+                                        <span className={cn("inline-block h-1.5 w-1.5 rounded-full", accent.ring)} />
+                                        {g.section}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── Search results — a flat grid replaces the sections ── */}
+            {!compact && q && (
+                <section className="relative rounded-2xl border border-border/60 bg-muted/20 p-4 md:p-5">
+                    <header className="mb-3 flex items-baseline justify-between">
+                        <h3 className="text-sm font-bold tracking-tight">Results for “{query.trim()}”</h3>
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                            {searchResults.length} {searchResults.length === 1 ? "tool" : "tools"}
+                        </span>
+                    </header>
+                    {searchResults.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-6 text-center">
+                            Nothing matches — try a different word, or browse the sections below.
+                        </p>
+                    ) : (
+                        <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                            {searchResults.map((item) => (
+                                <MenuCard
+                                    key={item.href}
+                                    item={item}
+                                    active={path === item.href}
+                                    pending={pending}
+                                    unread={unread}
+                                    onNavigate={onNavigate}
+                                    accent={SECTION_ACCENT[item.section ?? ""] ?? SECTION_ACCENT.Setup!}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </section>
+            )}
+
             {/* ── Quick access hero ─────────────────────────────────────
               * Featured card on the left, smaller pinned cards on the
               * right. Renders only on the full launcher (compact mode
               * keeps the simpler grid). */}
-            {!compact && featuredItem && (
+            {!compact && !q && featuredItem && (
                 <section>
                     <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-muted-foreground mb-3 flex items-center gap-2">
                         <span className="inline-block h-1.5 w-8 rounded-full bg-primary" />
@@ -309,14 +392,15 @@ export function MenuCards({ onNavigate, compact }: MenuCardsProps) {
               * the panel, so the whole page reads as a set of "rooms"
               * (Operations / Kitchen / Catalog / …) rather than a flat
               * list of icons under faint headings. */}
-            {groups.map((g) => {
+            {(compact || !q) && groups.map((g) => {
                 const accent = SECTION_ACCENT[g.section] ?? SECTION_ACCENT.Setup!
                 const subtitle = SECTION_SUBTITLE[g.section]
                 return (
                     <section
                         key={g.section}
+                        id={`launcher-${g.section}`}
                         className={cn(
-                            "relative rounded-2xl border p-4 md:p-5 overflow-hidden",
+                            "relative rounded-2xl border p-4 md:p-5 overflow-hidden scroll-mt-20",
                             "shadow-sm dark:shadow-none",
                             accent.panel,
                             accent.panelBorder,

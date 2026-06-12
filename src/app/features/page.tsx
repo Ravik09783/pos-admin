@@ -15,8 +15,9 @@ export const metadata: Metadata = {
     title: "Features — every tool a modern restaurant needs",
     description:
         "RestoPOS features: fast POS billing, realtime kitchen display, country-aware tax (GST/VAT/sales tax), "
-        + "QR table ordering, PhonePe UPI direct payments, bank reconciliation, loyalty, gift cards, demand forecasting, "
-        + "and one-click CA Export for India.",
+        + "QR table ordering, PhonePe & Paytm UPI direct payments, multi-outlet management, customer-facing display, "
+        + "Swiggy & Zomato settlement tracking, accounting + bank reconciliation, loyalty, gift cards, demand "
+        + "forecasting, per-location reports in CSV/Excel/PDF, and one-click CA Export for India.",
     alternates: { canonical: "/features" },
     openGraph: {
         type: "website",

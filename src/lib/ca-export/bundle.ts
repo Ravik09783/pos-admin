@@ -4,18 +4,21 @@ import JSZip from "jszip"
 import { saveAs } from "file-saver"
 
 import { formatCurrency } from "@/lib/utils"
+import { buildSalesCsv } from "./csv"
 import { buildExcelWorkbook } from "./excel"
 import { buildGSTR1Json } from "./gst-portal"
-import { exportLocale, type ExportLocale } from "./locale"
+import { BRANCH_SCOPE_NOTE, exportLocale, scopeLabel, type ExportLocale } from "./locale"
 import { buildPdfReport } from "./pdf"
 import { buildTallyXml } from "./tally"
 import type { ExportDataset } from "./types"
 
-interface BundleOptions {
+export interface BundleOptions {
     excel?: boolean
     tally?: boolean
     gstPortal?: boolean
     pdf?: boolean
+    /** Sales register as plain CSV (country-aware tax columns). */
+    csv?: boolean
     /** Include README.txt with filing instructions. */
     readme?: boolean
 }
@@ -39,13 +42,17 @@ export async function downloadCABundle(
     const include: Required<BundleOptions> = {
         excel: opts?.excel ?? true,
         pdf: opts?.pdf ?? true,
+        csv: opts?.csv ?? true,
         readme: opts?.readme ?? true,
         tally: opts?.tally ?? loc.isIndia,
         gstPortal: opts?.gstPortal ?? loc.isIndia,
     }
 
     const zip = new JSZip()
-    const slug = `${slugify(data.tenant.name)}_${data.period.fyLabel}_${String(data.period.monthNum).padStart(2, "0")}`
+    // Branch-scoped exports carry the location in the filename so two
+    // downloads for two outlets never overwrite each other.
+    const branchSlug = data.branch ? `_${slugify(data.branch.name)}` : ""
+    const slug = `${slugify(data.tenant.name)}${branchSlug}_${data.period.fyLabel}_${String(data.period.monthNum).padStart(2, "0")}`
 
     if (include.excel) {
         const buf = await buildExcelWorkbook(data)
@@ -59,6 +66,10 @@ export async function downloadCABundle(
     }
     if (include.pdf) {
         zip.file(`${slug}_Filing_Summary.pdf`, buildPdfReport(data))
+    }
+    if (include.csv) {
+        // BOM prefix so Excel opens UTF-8 (₹, é, …) correctly on Windows.
+        zip.file(`${slug}_Sales_Register.csv`, "﻿" + buildSalesCsv(data))
     }
     if (include.readme) {
         zip.file(`README.txt`, buildReadme(data, loc, include))
@@ -106,6 +117,11 @@ function buildReadme(data: ExportDataset, loc: ExportLocale, include: Required<B
     if (include.pdf) {
         files.push(`${n++}. *_Filing_Summary.pdf     — Human-readable filing summary`)
     }
+    if (include.csv) {
+        files.push(`${n++}. *_Sales_Register.csv     — Raw sales rows (one per bill)
+                              · ${loc.isIndia ? "CGST / SGST / IGST columns" : `${loc.taxName} column follows your country's tax model`}
+                              · Opens in Excel / Google Sheets / Numbers`)
+    }
 
     // Filing checklist — India keeps the statutory GSTR deadlines; everyone
     // else gets generic guidance (deadlines vary by jurisdiction).
@@ -125,15 +141,16 @@ function buildReadme(data: ExportDataset, loc: ExportLocale, include: Required<B
 [ ] File your ${loc.taxName} return with ${authorityFor(loc)} by your jurisdiction's deadline
 [ ] Sign and reconcile the P&L`
 
+    const location = scopeLabel(data)
     return `RestoPOS — Tax Filing Bundle
 ============================
 Restaurant : ${data.tenant.name}
 Country    : ${loc.cfg.name}
-${loc.taxIdLabel.padEnd(11)}: ${data.tenant.gstin ?? "—"}
+${location ? `Location   : ${location}\n` : ""}${loc.taxIdLabel.padEnd(11)}: ${data.tenant.gstin ?? "—"}
 Period     : ${data.period.label}
 FY         : ${data.period.fyLabel}
 Generated  : ${new Date().toISOString()}
-
+${data.branch ? `\nNote: ${BRANCH_SCOPE_NOTE}\n` : ""}
 Files in this bundle
 --------------------
 ${files.join("\n\n")}

@@ -70,11 +70,47 @@ export function SelfPunchCard() {
 
     useEffect(() => { load() }, [load])
 
+    /** Best-effort device position. Resolves null when the browser has no
+     *  geolocation, times out, or the staffer declines — the server only
+     *  enforces a position when the branch actually has a geofence pin. */
+    function getPosition(): Promise<{ lat: number; lng: number } | null> {
+        return new Promise((resolve) => {
+            if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null)
+            navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                () => resolve(null),
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 },
+            )
+        })
+    }
+
     async function punch(action: "IN" | "OUT") {
         setBusy(true)
         try {
-            const { data, error } = await supabase.rpc("hr_self_punch" as never, { p_action: action } as never)
-            if (error) throw new Error(error.message)
+            const pos = await getPosition()
+            let { data, error } = await supabase.rpc("hr_self_punch" as never, {
+                p_action: action,
+                p_lat: pos?.lat ?? null,
+                p_lng: pos?.lng ?? null,
+            } as never)
+            // Deploy-order safety: until migration 60 lands, the DB only has
+            // the old 1-arg hr_self_punch — PostgREST answers PGRST202 for
+            // the 3-arg call. Retry without coordinates so punching keeps
+            // working; the geofence simply isn't enforced yet.
+            if (error && /PGRST202|function .*hr_self_punch/i.test(`${(error as { code?: string }).code} ${error.message}`)) {
+                ;({ data, error } = await supabase.rpc("hr_self_punch" as never, { p_action: action } as never))
+            }
+            if (error) {
+                // Translate the geofence guards into human messages.
+                if (/location_required/i.test(error.message)) {
+                    throw new Error("Turn on location access to mark attendance — the restaurant requires you to be on-site.")
+                }
+                if (/outside_geofence/i.test(error.message)) {
+                    const m = /~(\d+) m/.exec(error.message)
+                    throw new Error(`You're too far from the restaurant${m ? ` (~${m[1]} m away)` : ""} — come within range and try again.`)
+                }
+                throw new Error(error.message)
+            }
             // Update straight from the RPC result rather than re-querying by the
             // browser's local "today" — keeps the card correct even when the
             // staffer's device timezone differs from the restaurant's.

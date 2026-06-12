@@ -32,7 +32,7 @@ async function loadDisplayMenu(slug: string) {
     const [{ data: items }, { data: recRows }] = await Promise.all([
         supabase
             .from("menu_items")
-            .select("id, name, base_price, sale_price, image_url, is_sold_out")
+            .select("id, name, description, food_type, base_price, sale_price, image_url, is_sold_out")
             .eq("tenant_id", tenantId)
             .is("deleted_at", null)
             .eq("is_active", true),

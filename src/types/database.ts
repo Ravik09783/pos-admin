@@ -711,6 +711,11 @@ export interface Branch {
     email: string | null
     is_main: boolean
     is_active: boolean
+    /** Geofenced attendance pin (migration 60). NULL = staff can self-punch
+     *  from anywhere; set = punches accepted only within the radius. */
+    latitude: number | null
+    longitude: number | null
+    geofence_radius_m: number
     created_at: string
     updated_at: string
 }

@@ -16,6 +16,9 @@ export interface ExportPeriod {
 export interface SalesRow {
     invoice_number: string
     invoice_date: string
+    /** Name of the branch ("location") the bill was raised at — null for
+     *  pre-branch data or single-outlet tenants. */
+    branch_name: string | null
     customer_name: string | null
     customer_gstin: string | null
     customer_state_code: string | null
@@ -99,6 +102,15 @@ export interface BalanceSheetSnapshot {
 
 export interface ExportDataset {
     period: ExportPeriod
+    /** The branch ("location") this export is scoped to. Null = every
+     *  location (or a single-outlet tenant with no branches set up).
+     *  Only SALES are branch-scoped — purchases, expenses and balance-sheet
+     *  entries have no branch attribution in the schema and stay
+     *  company-wide; the builders surface that caveat wherever it matters. */
+    branch: { id: string; name: string } | null
+    /** Number of active branches the tenant has — 0 when branches were never
+     *  set up. Lets builders decide whether a "Branch" column is meaningful. */
+    branches_total: number
     tenant: {
         name: string
         /** Country name as stored on tenants.country (e.g. "India", "United Kingdom").

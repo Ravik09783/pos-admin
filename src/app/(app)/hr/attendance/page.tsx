@@ -156,6 +156,22 @@ function AttendanceInner() {
         [employees, drafts],
     )
 
+    // Live day-at-a-glance counts for the stat strip — computed off the
+    // drafts so they update the instant a status is changed, even before
+    // saving. "Marked" statuses only; unmarked is its own tile.
+    const dayStats = useMemo(() => {
+        const s = { present: 0, half: 0, leave: 0, absent: 0 }
+        for (const e of employees) {
+            const d = drafts[e.id]
+            if (!d?.existing) continue
+            if (d.status === "PRESENT") s.present++
+            else if (d.status === "HALF_DAY") s.half++
+            else if (d.status === "LEAVE") s.leave++
+            else if (d.status === "ABSENT") s.absent++
+        }
+        return s
+    }, [employees, drafts])
+
     return (
         <div className="container mx-auto py-6 md:py-8 px-4 max-w-6xl space-y-6">
             <PageHeader
@@ -169,6 +185,26 @@ function AttendanceInner() {
                     </Button>
                 }
             />
+
+            {/* Day at a glance — colour-coded tiles that tick live as the
+              * admin marks people, so "is everyone accounted for?" is
+              * answerable without scanning the table. */}
+            {!loading && employees.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                    {[
+                        { label: "Present", value: dayStats.present, cls: "border-success/30 bg-success/[0.06] text-success" },
+                        { label: "Half day", value: dayStats.half, cls: "border-warning/30 bg-warning/[0.06] text-warning" },
+                        { label: "Leave", value: dayStats.leave, cls: "border-primary/30 bg-primary/[0.06] text-primary" },
+                        { label: "Absent", value: dayStats.absent, cls: "border-destructive/30 bg-destructive/[0.06] text-destructive" },
+                        { label: "Unmarked", value: unmarkedCount, cls: "border-border bg-muted/30 text-muted-foreground" },
+                    ].map((t) => (
+                        <div key={t.label} className={cn("rounded-xl border px-3.5 py-2.5", t.cls)}>
+                            <div className="text-2xl font-bold tabular-nums leading-none">{t.value}</div>
+                            <div className="mt-1 text-[11px] font-medium uppercase tracking-wide opacity-80">{t.label}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             <Card>
                 <CardHeader className="flex-row items-center justify-between py-3 space-y-0 flex-wrap gap-3">

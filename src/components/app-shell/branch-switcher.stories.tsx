@@ -18,6 +18,9 @@ const branch = (id: string, name: string, is_main = false): Branch => ({
     pincode: null,
     phone: null,
     email: null,
+    latitude: null,
+    longitude: null,
+    geofence_radius_m: 50,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
 })

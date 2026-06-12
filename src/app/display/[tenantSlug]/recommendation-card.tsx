@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Heart, Plus, UtensilsCrossed } from "lucide-react"
+import { Heart, Sparkles, UtensilsCrossed } from "lucide-react"
 
 import { formatCurrency } from "@/lib/utils"
 
@@ -10,6 +10,13 @@ export interface RecSuggestion {
     id: string
     name: string
     price: number
+    /** Pre-sale price when the item is discounted — rendered struck-through
+     *  next to a "% OFF" pill so the deal is impossible to miss. */
+    original_price?: number | null
+    /** One-line menu description — the appetite copy that actually sells. */
+    description?: string | null
+    /** VEG / NON_VEG / EGG / VEGAN — renders the Indian-style diet mark. */
+    food_type?: string | null
     image_url: string | null
     /** Why we're showing THIS item to THIS customer — the name of the
      *  cart item the admin paired it with. Surfaced on the card as
@@ -35,13 +42,34 @@ export function Spark({ className, size }: { className?: string; size?: number }
     )
 }
 
+/** Indian FSSAI-style diet mark: a tiny rounded square with a dot —
+ *  green = veg/vegan, red = non-veg, amber = egg. Nothing for unknown. */
+function DietMark({ foodType }: { foodType?: string | null }) {
+    const t = (foodType ?? "").toUpperCase()
+    if (!t) return null
+    const color =
+        t === "NON_VEG" ? "border-red-500 text-red-500"
+        : t === "EGG" ? "border-amber-400 text-amber-400"
+        : "border-emerald-500 text-emerald-500" // VEG + VEGAN
+    return (
+        <span
+            aria-label={t === "NON_VEG" ? "Non-vegetarian" : t === "EGG" ? "Contains egg" : "Vegetarian"}
+            className={`inline-grid h-4 w-4 shrink-0 place-items-center rounded-[4px] border-2 bg-black/40 backdrop-blur-sm ${color}`}
+        >
+            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+        </span>
+    )
+}
+
 /**
  * The visual face of an upsell card — a 3:4 "treasure" card.
  *
- * Full-bleed food photography under a legibility scrim, the dish name
- * and an "Add for …" price anchored to the foot, and — the signature —
- * a sparkling chase-light border: a slow conic-gradient wheel clipped to
- * a 3px rim, so light keeps travelling around the edge.
+ * Full-bleed food photography under a legibility scrim; the info layer
+ * sells the dish: the honest "Pairs with <cart item>" chip, the diet
+ * mark + dish name, one line of appetite copy from the menu description,
+ * and the price block — struck-through original + "% OFF" pill when a
+ * sale is running. The signature sparkling chase-light border (a slow
+ * conic-gradient wheel clipped to a 3px rim) stays.
  *
  * This is purely the artwork. The treasure halo, the gentle float and
  * the twinkling sparkles live in `recommendation-treasure.tsx`.
@@ -52,6 +80,10 @@ export function RecommendationCardFace({
     suggestion: RecSuggestion
     currency: string
 }) {
+    const orig = Number(suggestion.original_price ?? 0)
+    const onSale = orig > 0 && orig > suggestion.price
+    const pctOff = onSale ? Math.round(((orig - suggestion.price) / orig) * 100) : 0
+
     return (
         <div className="relative aspect-[3/4] w-full overflow-hidden rounded-[1.7rem] p-[3px]">
             {/* Sparkling chase-light border — a conic gradient wheeling
@@ -87,7 +119,7 @@ export function RecommendationCardFace({
                 )}
 
                 {/* Legibility scrim — dark at the foot, clear at the top. */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
 
                 {/* A glare that rakes across the photo every few seconds. */}
                 <motion.div
@@ -98,22 +130,26 @@ export function RecommendationCardFace({
                     transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 3.2, ease: "easeInOut" }}
                 />
 
-                {/* "Add-on" marker, top-right */}
-                <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 ring-1 ring-white/25 backdrop-blur-md">
-                    <Plus className="h-3 w-3 text-white" strokeWidth={3} />
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-white">Add-on</span>
-                </div>
+                {/* Top-right: % OFF when a sale runs, else "Chef's pick". */}
+                {onSale ? (
+                    <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-gradient-to-r from-rose-500 to-orange-500 px-2.5 py-1 shadow-[0_4px_14px_-2px_rgba(244,63,94,0.7)]">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wide text-white">
+                            {pctOff}% off
+                        </span>
+                    </div>
+                ) : (
+                    <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 ring-1 ring-white/25 backdrop-blur-md">
+                        <Sparkles className="h-3 w-3 text-amber-300" />
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-white">Chef&apos;s pick</span>
+                    </div>
+                )}
 
-                {/* Reason · name · price, anchored to the foot.
-                  *
-                  * The "Pairs with <X>" chip replaces the old random
-                  * "Popular add-on" / "Chef's pick" sticker. The
-                  * trigger item name comes from the cart item the
-                  * admin paired this recommendation with (curated in
-                  * /menu-admin → Variants & modifiers → recommendations).
-                  * Showing it tells the guest *why* this specific dish
-                  * is on screen for them right now — same data, much
-                  * more credible than a generic sticker. */}
+                {/* Reason · diet mark + name · appetite copy · price block,
+                  * anchored to the foot. "Pairs with <X>" is the honest,
+                  * data-driven hook (the admin curated this pairing in
+                  * /menu-admin); the description line is the menu's own
+                  * appetite copy; the price block leans on the sale
+                  * strikethrough to close the sale. */}
                 <div className="absolute inset-x-0 bottom-0 p-4">
                     <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-amber-400/20 px-2.5 py-1 ring-1 ring-amber-300/40 backdrop-blur-sm">
                         <Heart
@@ -126,9 +162,17 @@ export function RecommendationCardFace({
                             <span className="font-bold text-amber-100">{suggestion.pairedWith}</span>
                         </span>
                     </div>
-                    <h3 className="mt-1.5 line-clamp-2 text-xl font-bold leading-tight text-white drop-shadow-sm">
-                        {suggestion.name}
-                    </h3>
+                    <div className="mt-1.5 flex items-start gap-1.5">
+                        <span className="mt-1"><DietMark foodType={suggestion.food_type} /></span>
+                        <h3 className="line-clamp-2 text-xl font-bold leading-tight text-white drop-shadow-sm">
+                            {suggestion.name}
+                        </h3>
+                    </div>
+                    {suggestion.description && (
+                        <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-white/75">
+                            {suggestion.description}
+                        </p>
+                    )}
                     <div className="mt-2.5 flex items-center gap-2">
                         <span className="text-[11px] font-medium uppercase tracking-wide text-white/60">
                             Add for
@@ -136,6 +180,11 @@ export function RecommendationCardFace({
                         <span className="rounded-lg bg-gradient-to-br from-amber-300 via-amber-400 to-amber-500 px-2.5 py-1 text-base font-extrabold tabular-nums text-amber-950 shadow-[0_4px_14px_-2px_rgba(251,191,36,0.6)]">
                             {formatCurrency(suggestion.price, currency)}
                         </span>
+                        {onSale && (
+                            <span className="text-sm font-semibold tabular-nums text-white/55 line-through decoration-white/50">
+                                {formatCurrency(orig, currency)}
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>

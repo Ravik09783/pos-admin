@@ -31,7 +31,6 @@
  */
 
 import { getTaxConfig } from "@/lib/tax/locale-config"
-import { exportLocale, taxCells } from "@/lib/ca-export/locale"
 import type { ExportDataset } from "@/lib/ca-export/types"
 
 /** Loose enum of the file types we produce. Used for icon selection in the UI. */
@@ -74,12 +73,14 @@ export interface CountryReportConfig {
 // =========================================================================
 
 function slugFilename(dataset: ExportDataset, name: string, ext: string): string {
-    const tenantSlug = dataset.tenant.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/(^_|_$)/g, "") || "restaurant"
+    const slug = (s: string) =>
+        s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/(^_|_$)/g, "")
+    const tenantSlug = slug(dataset.tenant.name) || "restaurant"
+    // Branch-scoped exports name their location so per-outlet downloads
+    // don't overwrite each other (mirrors bundle.ts's zip naming).
+    const branchSlug = dataset.branch ? `_${slug(dataset.branch.name)}` : ""
     const month = String(dataset.period.monthNum).padStart(2, "0")
-    return `${tenantSlug}_${dataset.period.fyLabel}_${month}_${name}.${ext}`
+    return `${tenantSlug}${branchSlug}_${dataset.period.fyLabel}_${month}_${name}.${ext}`
 }
 
 // =========================================================================
@@ -169,32 +170,8 @@ const formatSalesCsv: ReportFormat = {
     fileExtension: "csv",
     advanced: true,
     async build(dataset) {
-        const loc = exportLocale(dataset.tenant.country)
-        const rows = [
-            [
-                "Invoice", "Date", "Customer",
-                ...(loc.isIndia ? ["Place of supply"] : []),
-                "Taxable", ...loc.taxColumns, "Service charge", "Grand total", "Status",
-            ],
-            ...dataset.sales.map((s) => [
-                s.invoice_number,
-                s.invoice_date,
-                s.customer_name ?? "",
-                ...(loc.isIndia ? [s.place_of_supply ?? ""] : []),
-                s.taxable_amount.toFixed(2),
-                ...taxCells(loc, s).map((n) => n.toFixed(2)),
-                s.service_charge.toFixed(2),
-                s.grand_total.toFixed(2),
-                s.bill_status,
-            ]),
-        ]
-        // Lightweight CSV — quotes around any field containing comma/quote/newline.
-        const csv = rows.map((r) =>
-            r.map((cell) => {
-                const s = String(cell ?? "")
-                return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-            }).join(","),
-        ).join("\n")
+        const { buildSalesCsv } = await import("@/lib/ca-export/csv")
+        const csv = buildSalesCsv(dataset)
         return {
             blob: new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }),
             filename: slugFilename(dataset, "Sales_Register", "csv"),

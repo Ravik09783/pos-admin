@@ -21,7 +21,6 @@ import { ROLE_LABELS } from "@/lib/rbac/permissions"
 import { tenantImagePath } from "@/lib/storage/image-upload"
 import { computeAge } from "@/lib/profile/age"
 import { formatDate } from "@/lib/utils"
-import { PlanCapacityCard, type PlanCapacitySummary } from "@/components/billing/plan-capacity-card"
 import type { AppUser, Branch, RoleTemplate, StaffInvite, UserRole } from "@/types/database"
 
 const ROLES: UserRole[] = ["OWNER", "MANAGER", "CASHIER", "CAPTAIN", "KITCHEN", "DELIVERY", "AUDITOR"]
@@ -68,7 +67,6 @@ export default function StaffPage() {
      *  picks rather than wait for a 403. */
     const [myPerms, setMyPerms] = useState<Set<string>>(new Set())
     const [branchFilter, setBranchFilter] = useState<string>("ALL")
-    const [capacity, setCapacity] = useState<PlanCapacitySummary | null>(null)
     // Toggle between "Active only" and "Show inactive too" so admins
     // can see deactivated staff (and reactivate them if their plan
     // allows). Inactive staff are exempted from the seat counter on
@@ -145,7 +143,7 @@ export default function StaffPage() {
         setTenantId(row.tenant_id)
         const callerTpl = Array.isArray(row.role_template) ? row.role_template[0] : row.role_template
         setMyPerms(new Set(callerTpl?.permissions ?? []))
-        const [{ data: us }, { data: ivs }, { data: brs }, { data: tpls }, capRes] = await Promise.all([
+        const [{ data: us }, { data: ivs }, { data: brs }, { data: tpls }] = await Promise.all([
             supabase.from("users").select("*").order("created_at"),
             supabase.from("staff_invites").select("*").order("created_at", { ascending: false }),
             supabase.from("branches").select("*").eq("is_active", true).order("name"),
@@ -154,15 +152,11 @@ export default function StaffPage() {
                 .order("is_system", { ascending: false })
                 .order("base_role", { ascending: true })
                 .order("name", { ascending: true }),
-            fetch("/api/billing/plan-capacity").then((r) => r.ok ? r.json() : null).catch(() => null),
         ])
         setUsers((us ?? []) as AppUser[])
         setInvites((ivs ?? []) as StaffInvite[])
         setBranches((brs ?? []) as Branch[])
         setTemplates((tpls ?? []) as RoleTemplate[])
-        if (capRes && typeof capRes === "object" && !("error" in capRes)) {
-            setCapacity(capRes as PlanCapacitySummary)
-        }
     }
     useEffect(() => { refresh() }, [])
 
@@ -209,31 +203,12 @@ export default function StaffPage() {
     const branchNameById = (id: string | null | undefined) =>
         id ? branches.find((b) => b.id === id)?.name ?? "—" : "—"
 
-    // Pre-flight cap state for the "Add staff" CTA. If a single
-    // branch is selected via the filter, gate on THAT branch's cap;
-    // otherwise gate on whether ANY branch has room (the create
-    // dialog still requires a specific branch, but a global cap-out
-    // means no branch can accept a new seat).
+    // Staff seats are UNLIMITED on every plan (migration 59) — the Add
+    // staff CTA is never capacity-gated. Branch limits live on the
+    // Branches settings page.
     const inactiveStaffCount = users.filter((u) => u.is_active === false).length
-    const branchCap = capacity?.branches.find((b) => b.id === branchFilter)
-    // Vacuous-truth guard: `.every` on an empty array is `true`. If
-    // there are zero ACTIVE branches we don't want to disable Add Staff
-    // for a phantom cap — the create dialog already requires a branch
-    // pick when the tenant has 2+, and gates on zero branches elsewhere.
-    const activeBranches = capacity?.branches.filter((b) => b.is_active) ?? []
-    const everyBranchAtCap = capacity != null
-        && !capacity.unlimited
-        && activeBranches.length > 0
-        && activeBranches.every((b) => b.staff_at_cap)
-    const addStaffDisabled = capacity != null
-        && !capacity.unlimited
-        && (branchFilter !== "ALL"
-            ? Boolean(branchCap?.staff_at_cap)
-            : everyBranchAtCap)
-    const addStaffTooltip = !addStaffDisabled ? undefined
-        : branchFilter !== "ALL"
-            ? `This outlet has reached its plan limit of ${capacity?.max_staff_per_branch} staff. Deactivate someone here or upgrade your plan.`
-            : "Every active outlet has reached its plan limit. Deactivate a staff seat or upgrade your plan."
+    const addStaffDisabled = false
+    const addStaffTooltip: string | undefined = undefined
 
     function genPassword(): string {
         // 12-char readable temp password — admin can copy from the dialog.
@@ -461,7 +436,6 @@ export default function StaffPage() {
                 }
             />
 
-            <PlanCapacityCard mode="staff" summary={capacity} />
 
             <Card>
                 <CardHeader className="flex-row items-center justify-between py-3 space-y-0 flex-wrap gap-3">

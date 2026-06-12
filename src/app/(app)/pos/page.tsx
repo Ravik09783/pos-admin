@@ -1302,6 +1302,21 @@ export default function POSPage() {
             // checkout_url — do NOT write the QR now, or it would jump
             // back onto the customer screen (the "stuck on QR" bug).
             if (checkoutMethodRef.current !== "UPI") return
+            // No gateway QR (tenant runs plain manual UPI, or the gateway
+            // mint failed) — fall back to a merchant-UPI intent built from
+            // the tenant's UPI ID. No webhook on this path: the customer
+            // pays, the cashier verifies in their merchant app and records
+            // the payment (UTR reference) via the normal Generate-bill flow.
+            if (!qrData && tenantUpiId && totals && totals.grand_total > 0) {
+                const payee = encodeURIComponent(tenantUpiPayeeName ?? tenantName ?? "")
+                const txnRef = `POS-${Date.now().toString().slice(-8)}`
+                qrData = `upi://pay?pa=${tenantUpiId}&pn=${payee}&am=${totals.grand_total.toFixed(2)}&cu=INR&tr=${txnRef}`
+                autoConfirm = false
+                sessionRef = null
+                // A deliberately-manual tenant isn't a "fallback" — only keep
+                // the warning when an auto-gateway actually failed.
+                if (notConfigured) fallbackReason = null
+            }
             if (qrData) {
                 setCheckoutQr(qrData)
                 setPhonePeAutoConfirm(autoConfirm)
@@ -1322,7 +1337,7 @@ export default function POSPage() {
                 setPhonePeFallbackReason(null)
                 setCheckoutQrError(
                     notConfigured
-                        ? "The owner hasn't set up a payment method yet — add PhonePe or a UPI ID to accept UPI."
+                        ? "The owner hasn't set up a payment method yet — connect PhonePe/Paytm or add a UPI ID in Settings → Payments."
                         : `Couldn't prepare the UPI QR — ${transportErr}.`,
                 )
                 // No QR — show the customer a neutral "staff will help"

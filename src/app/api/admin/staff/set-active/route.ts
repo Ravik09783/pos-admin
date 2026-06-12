@@ -69,24 +69,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Manager can't toggle an Owner" }, { status: 403 })
     }
 
-    // ── Plan-cap guard on REACTIVATION ──────────────────────────────────
-    // The OWNER could have onboarded a replacement after deactivating
-    // this user — flipping the old row back on would silently put the
-    // branch over its per-seat cap. The SQL RPC returns TRUE during
-    // TRIAL and when the cap is unlimited, so this only fires when
-    // we're truly at-cap on a paid plan.
-    if (active) {
-        const { data: ok, error: capErr } = await supabase.rpc(
-            "can_reactivate_user" as never,
-            { p_user_id: targetId } as never,
-        )
-        if (!capErr && ok === false) {
-            return NextResponse.json({
-                error: "Your plan has reached its staff-per-outlet limit. Deactivate another staff member at this branch, or upgrade your plan, before reactivating this one.",
-                code: "plan_limit",
-            }, { status: 403 })
-        }
-    }
+    // Staff seats are unlimited on every plan (migration 59) — reactivation
+    // never hits a cap, so no plan pre-flight here.
 
     const admin = createServiceRoleClient()
 

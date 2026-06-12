@@ -39,16 +39,31 @@ export function buildPeriod(year: number, month: number, fyStartMonth = 4): Expo
     }
 }
 
-export async function fetchExportDataset(periodIn: ExportPeriod): Promise<ExportDataset> {
+export interface ExportScope {
+    /** Restrict SALES to one branch ("location"). Null/undefined = every
+     *  branch the caller can read. Purchases / expenses / balance sheet have
+     *  no branch column in the schema and always stay tenant-wide. */
+    branchId?: string | null
+}
+
+export async function fetchExportDataset(periodIn: ExportPeriod, scope?: ExportScope): Promise<ExportDataset> {
     const supabase = createClient()
+    const branchId = scope?.branchId ?? null
 
     const { data: u } = await supabase.auth.getUser()
     if (!u.user) throw new Error("Not signed in")
     const { data: row } = await supabase.from("users").select("tenant_id").eq("id", u.user.id).maybeSingle()
     if (!row?.tenant_id) throw new Error("No tenant context")
 
-    const { data: tenant } = await supabase.from("tenants").select("*").eq("id", row.tenant_id).maybeSingle()
+    const [{ data: tenant }, { data: branchRows }] = await Promise.all([
+        supabase.from("tenants").select("*").eq("id", row.tenant_id).maybeSingle(),
+        supabase.from("branches").select("id, name").eq("is_active", true),
+    ])
     if (!tenant) throw new Error("Tenant not found")
+
+    const branchNames = new Map<string, string>(
+        ((branchRows ?? []) as Array<{ id: string; name: string }>).map((b) => [b.id, b.name]),
+    )
 
     // The CA-export page builds the period with the April default; re-derive
     // it now that we know the tenant so the FY label (and the balance-sheet
@@ -68,13 +83,16 @@ export async function fetchExportDataset(periodIn: ExportPeriod): Promise<Export
     // "Bill without GST" rows (gst_excluded) are deliberately kept out of the
     // CA bundle — they never reach the accountant. neq(..., true) also matches
     // NULL, so bills from before this column existed are still included.
-    const { data: bills } = await supabase
+    let billsQ = supabase
         .from("bills")
         .select("*")
         .gte("created_at", period.fromDate)
         .lt("created_at", period.toDate)
         .neq("gst_excluded", true)
-        .order("created_at")
+    // Same semantics as scopeQueryToBranch(): a chosen branch filters
+    // strictly on bills.branch_id; "All branches" applies no filter.
+    if (branchId) billsQ = billsQ.eq("branch_id", branchId)
+    const { data: bills } = await billsQ.order("created_at")
     const billIds = (bills ?? []).map((b) => b.id)
     const orderIds = (bills ?? []).map((b) => b.order_id)
 
@@ -117,6 +135,7 @@ export async function fetchExportDataset(periodIn: ExportPeriod): Promise<Export
         return {
             invoice_number: b.invoice_number,
             invoice_date: b.created_at,
+            branch_name: b.branch_id ? branchNames.get(b.branch_id) ?? null : null,
             customer_name: b.customer_name,
             customer_gstin: b.customer_gstin,
             customer_state_code: b.customer_state_code,
@@ -290,6 +309,10 @@ export async function fetchExportDataset(periodIn: ExportPeriod): Promise<Export
 
     return {
         period,
+        branch: branchId
+            ? { id: branchId, name: branchNames.get(branchId) ?? "Selected location" }
+            : null,
+        branches_total: branchNames.size,
         tenant: {
             name: tenant.name,
             country: tenant.country ?? null,

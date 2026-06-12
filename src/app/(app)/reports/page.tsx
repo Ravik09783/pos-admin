@@ -3,18 +3,22 @@
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { ArrowRight, BarChart3, FileSpreadsheet, TrendingUp } from "lucide-react"
+import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/app-shell/page-header"
 import { createClient } from "@/lib/supabase/client"
 import { scopeQueryToBranch, useActiveBranch } from "@/lib/branch/active-branch"
+import { downloadSalesReport, type SalesReportFormat } from "@/lib/reports/sales-report-export"
+import { getTaxConfig } from "@/lib/tax/locale-config"
 import { cn, formatCurrency } from "@/lib/utils"
 import type { Bill, OrderItem, Payment } from "@/types/database"
 
@@ -33,7 +37,18 @@ export default function ReportsPage() {
     const [to, setTo] = useState(today)
     const [data, setData] = useState<ReportData | null>(null)
     const [loading, setLoading] = useState(true)
-    const { activeBranchId } = useActiveBranch()
+    const [exporting, setExporting] = useState(false)
+    const [country, setCountry] = useState<string | null>(null)
+    const { activeBranchId, activeBranch } = useActiveBranch()
+
+    // Tenant country once — drives the currency + tax wording stamped into
+    // the downloaded files (₹/GST for India, £/VAT for the UK, …).
+    useEffect(() => {
+        ;(async () => {
+            const { data: t } = await supabase.from("tenants").select("country").limit(1)
+            setCountry(t?.[0]?.country ?? null)
+        })()
+    }, [supabase])
 
     useEffect(() => {
         ;(async () => {
@@ -104,6 +119,40 @@ export default function ReportsPage() {
         return { revenue, totalTax, avgBill, validCount: valid.length, voidCount: data.bills.length - valid.length, topItems, byPayment, hours, peakHour, days }
     }, [data])
 
+    /** Download the on-screen report (already scoped to the active location
+     *  + date range) as CSV, Excel or PDF. */
+    async function handleDownload(format: SalesReportFormat) {
+        if (!stats) return
+        setExporting(true)
+        try {
+            const cfg = getTaxConfig(country)
+            await downloadSalesReport(
+                {
+                    from,
+                    to,
+                    branchName: activeBranch?.name ?? null,
+                    currency: cfg.currency,
+                    taxLabel: cfg.taxShortName,
+                    revenue: stats.revenue,
+                    totalTax: stats.totalTax,
+                    avgBill: stats.avgBill,
+                    validCount: stats.validCount,
+                    voidCount: stats.voidCount,
+                    topItems: stats.topItems,
+                    byPayment: stats.byPayment,
+                    hours: stats.hours,
+                    days: stats.days,
+                },
+                format,
+            )
+            toast.success(`Report downloaded (${format.toUpperCase()})`)
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : "Failed to build the report")
+        } finally {
+            setExporting(false)
+        }
+    }
+
     return (
         <div className="container mx-auto py-6 md:py-8 px-4 max-w-7xl space-y-6">
             <PageHeader
@@ -112,9 +161,27 @@ export default function ReportsPage() {
                 highlight="any date range"
                 description="Sales analytics, heatmaps, and item performance."
                 actions={
-                    <Button asChild variant="outline">
-                        <Link href="/ca-export"><FileSpreadsheet className="h-4 w-4" /> CA Export</Link>
-                    </Button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Download the current view (location + date range) in
+                         *  the admin's format of choice. */}
+                        <Select
+                            value=""
+                            onValueChange={(v) => handleDownload(v as SalesReportFormat)}
+                            disabled={loading || exporting || !stats}
+                        >
+                            <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder={exporting ? "Preparing…" : "Download as…"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="csv">CSV</SelectItem>
+                                <SelectItem value="xlsx">Excel (.xlsx)</SelectItem>
+                                <SelectItem value="pdf">PDF</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Button asChild variant="outline">
+                            <Link href="/ca-export"><FileSpreadsheet className="h-4 w-4" /> CA Export</Link>
+                        </Button>
+                    </div>
                 }
             />
 

@@ -83,6 +83,12 @@ interface Suggestion {
     id: string
     name: string
     price: number
+    /** Pre-sale price when a sale is running — rendered struck-through so
+     *  the deal reads as a deal. Null when the item isn't discounted. */
+    original_price: number | null
+    description: string | null
+    /** VEG / NON_VEG / EGG / VEGAN — drives the Indian-style diet dot. */
+    food_type: string | null
     image_url: string | null
     /** Name of the cart item that triggered this recommendation — the
      *  admin paired (cart-item → this) inside `menu_item_recommendations`.
@@ -96,6 +102,8 @@ interface DisplayMenuFeed {
     items: Array<{
         id: string
         name: string
+        description: string | null
+        food_type: string | null
         base_price: number
         sale_price: number | null
         image_url: string | null
@@ -130,8 +138,17 @@ function computeSuggestions(
             seen.add(rid)
             const sale = Number(it.sale_price)
             const base = Number(it.base_price)
-            const price = it.sale_price != null && sale > 0 && sale < base ? sale : base
-            out.push({ id: it.id, name: it.name, price, image_url: it.image_url, pairedWith: triggerName })
+            const onSale = it.sale_price != null && sale > 0 && sale < base
+            out.push({
+                id: it.id,
+                name: it.name,
+                price: onSale ? sale : base,
+                original_price: onSale ? base : null,
+                description: it.description ?? null,
+                food_type: it.food_type ?? null,
+                image_url: it.image_url,
+                pairedWith: triggerName,
+            })
             if (out.length >= 3) return out
         }
     }
@@ -812,7 +829,7 @@ function UpiScanPanel({ session }: { session: PosDisplaySession }) {
                     <span className="text-sm font-medium">{upiId}</span>
                 </div>
             )}
-            <div className="mt-3 text-xs text-muted-foreground">Google Pay · PhonePe · PhonePe · BHIM</div>
+            <div className="mt-3 text-xs text-muted-foreground">Google Pay · PhonePe · Paytm · BHIM</div>
             <p className="mt-1.5 text-xs text-muted-foreground">
                 {isAuto
                     ? "Confirms automatically once you pay"

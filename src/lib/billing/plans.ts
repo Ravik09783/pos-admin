@@ -41,8 +41,10 @@ export interface PlanDefinition {
     monthlyAmount: number
     /** Hard cap on branches/outlets. Use `UNLIMITED` for no cap. */
     maxBranches: number
-    /** Hard cap on staff accounts per branch (owner counts as the 1st seat).
-     *  Use `UNLIMITED` for no cap. */
+    /** Staff accounts per branch. As of migration 59 every tier ships
+     *  `UNLIMITED` — staff seats are never capped; plans differentiate on
+     *  branches/features only. The field (and its tenants mirror column)
+     *  stays so a future tier could reintroduce a cap. */
     maxStaffPerBranch: number
     /** Bullet-list features for the pricing card. Region-specific where it matters. */
     features: string[]
@@ -68,9 +70,9 @@ export const PLANS_IN: PlanDefinition[] = [
         currencySymbol: "₹",
         monthlyAmount: 3500,
         maxBranches: 1,
-        maxStaffPerBranch: 1,
+        maxStaffPerBranch: UNLIMITED,
         features: [
-            "1 outlet · 1 staff seat (owner)",
+            "1 outlet · Unlimited staff",
             ...COMMON_FEATURES,
             "PhonePe UPI payments — money straight to your bank",
             "One-click CA Export (GSTR-1 + 3B + P&L + BS)",
@@ -85,9 +87,9 @@ export const PLANS_IN: PlanDefinition[] = [
         currencySymbol: "₹",
         monthlyAmount: 5000,
         maxBranches: 3,
-        maxStaffPerBranch: 3,
+        maxStaffPerBranch: UNLIMITED,
         features: [
-            "3 outlets · 3 staff per outlet (9 seats)",
+            "3 outlets · Unlimited staff",
             ...COMMON_FEATURES,
             "PhonePe UPI payments — money straight to your bank",
             "One-click CA Export (GSTR-1 + 3B + P&L + BS)",
@@ -104,9 +106,9 @@ export const PLANS_IN: PlanDefinition[] = [
         currencySymbol: "₹",
         monthlyAmount: 10000,
         maxBranches: 10,
-        maxStaffPerBranch: 3,
+        maxStaffPerBranch: UNLIMITED,
         features: [
-            "10 outlets · 3 staff per outlet (30 seats)",
+            "10 outlets · Unlimited staff",
             ...COMMON_FEATURES,
             "PhonePe UPI payments — money straight to your bank",
             "One-click CA Export (GSTR-1 + 3B + P&L + BS)",
@@ -126,9 +128,9 @@ export const PLANS_INTL: PlanDefinition[] = [
         currencySymbol: "$",
         monthlyAmount: 49,
         maxBranches: 1,
-        maxStaffPerBranch: 1,
+        maxStaffPerBranch: UNLIMITED,
         features: [
-            "1 outlet · 1 staff seat (owner)",
+            "1 outlet · Unlimited staff",
             ...COMMON_FEATURES,
             "Stripe Connect — cards in 135+ currencies",
             "Live payments dashboard, payouts, disputes",
@@ -143,9 +145,9 @@ export const PLANS_INTL: PlanDefinition[] = [
         currencySymbol: "$",
         monthlyAmount: 99,
         maxBranches: 3,
-        maxStaffPerBranch: 3,
+        maxStaffPerBranch: UNLIMITED,
         features: [
-            "3 outlets · 3 staff per outlet (9 seats)",
+            "3 outlets · Unlimited staff",
             ...COMMON_FEATURES,
             "Stripe Connect — cards in 135+ currencies",
             "Live payments dashboard, payouts, disputes",
@@ -161,9 +163,9 @@ export const PLANS_INTL: PlanDefinition[] = [
         currencySymbol: "$",
         monthlyAmount: 199,
         maxBranches: 10,
-        maxStaffPerBranch: 3,
+        maxStaffPerBranch: UNLIMITED,
         features: [
-            "10 outlets · 3 staff per outlet (30 seats)",
+            "10 outlets · Unlimited staff",
             ...COMMON_FEATURES,
             "Stripe Connect — cards in 135+ currencies",
             "Live payments dashboard, payouts, disputes",

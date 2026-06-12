@@ -166,12 +166,16 @@ STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PLATFORM_FEE_PERCENT=1
 
-# Reconcile cron auth (PhonePe + Paytm reconcile endpoints)
+# Cron auth (daily maintenance tick + reconcile endpoints)
 CRON_SECRET=
 ```
 
-Schedule both reconcile endpoints every ~10 minutes with
-`Authorization: Bearer <CRON_SECRET>`.
+`vercel.json` schedules **one daily cron** — `GET /api/cron/daily` — which runs
+the PhonePe reconcile, the Paytm reconcile, and the HR attendance
+auto-checkout in sequence (Vercel's free plan allows only daily crons). On a
+paid plan you can additionally point an every-10-minutes schedule directly at
+`/api/payments/{phonepe,paytm}/reconcile` for faster missed-webhook recovery.
+All of them auth with `Authorization: Bearer <CRON_SECRET>`.
 
 ---
 

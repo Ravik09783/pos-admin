@@ -21,6 +21,7 @@
  */
 
 import { getTaxConfig, type CountryTaxConfig, type TaxModel } from "@/lib/tax/locale-config"
+import type { ExportDataset } from "./types"
 
 export interface ExportLocale {
     cfg: CountryTaxConfig
@@ -98,3 +99,29 @@ export function taxCells(loc: ExportLocale, t: TaxTriple): number[] {
 export function combinedTax(t: TaxTriple): number {
     return t.cgst_amount + t.sgst_amount + t.igst_amount
 }
+
+type ScopedDataset = Pick<ExportDataset, "branch" | "branches_total">
+
+/**
+ * Human label for the dataset's location scope, shared by every builder so
+ * the Excel cover, PDF header, CSV and README all say the same thing:
+ *   branch chosen        → the branch name
+ *   "All branches" view  → "All locations"
+ *   no branches set up   → null (single outlet; a location line is noise)
+ */
+export function scopeLabel(data: ScopedDataset): string | null {
+    if (data.branch) return data.branch.name
+    return data.branches_total > 0 ? "All locations" : null
+}
+
+/** True when a per-row "Branch" column adds information — i.e. the export
+ *  spans more than one location. */
+export function showBranchColumn(data: ScopedDataset): boolean {
+    return !data.branch && data.branches_total > 1
+}
+
+/** The caveat shown on branch-scoped exports: only sales carry a branch in
+ *  the schema, so the purchase/expense/balance-sheet sections stay
+ *  company-wide even when one location is selected. */
+export const BRANCH_SCOPE_NOTE =
+    "Sales are scoped to this location. Purchases, expenses and balance-sheet entries are recorded company-wide."
